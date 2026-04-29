@@ -3,10 +3,6 @@
 
 {% block title %}{{ resource.name }} - GamedziRent{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.min.css">
-{% endblock %}
-
 {% block content %}
 
 <section class="site-hero site-hero-innerpage overlay" data-stellar-background-ratio="0.5" style="background-image: url('{% static "reservations/images/big_image_1.jpg" %}');">
@@ -31,10 +27,13 @@
   <div class="container">
     <div class="row">
 
-      <div class="col-md-6">
-        <h2 class="mb-5">Formulaire de réservation</h2>
+      <div class="col-lg-6 mb-5 mb-lg-0">
+        <h2 class="mb-3">Formulaire de réservation</h2>
+        <p class="mb-5">
+          Votre créneau est vérifié avant l’envoi du lien. La réservation ne sera enregistrée qu’après paiement confirmé.
+        </p>
 
-        <form method="post">
+        <form method="post" class="reservation-payment-form">
           {% csrf_token %}
 
           {% if form.non_field_errors %}
@@ -45,23 +44,10 @@
 
           <div class="row">
             {% for field in form %}
-              <div class="{% if field.name == 'notes' or field.name == 'message' %}col-md-12{% else %}col-sm-6{% endif %} form-group">
+              <div class="{% if field.name == 'notes' or field.name == 'message' %}col-12{% else %}col-12 col-md-6{% endif %} form-group">
 
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-
-                {% if field.name == 'start_date' or field.name == 'starts_at' or field.name == 'arrival_date' %}
-                  <div style="position: relative;">
-                    <span class="fa fa-calendar icon" style="position: absolute; right: 10px; top: 10px;"></span>
-                    {{ field }}
-                  </div>
-                {% elif field.name == 'end_date' or field.name == 'ends_at' or field.name == 'departure_date' %}
-                  <div style="position: relative;">
-                    <span class="fa fa-calendar icon" style="position: absolute; right: 10px; top: 10px;"></span>
-                    {{ field }}
-                  </div>
-                {% else %}
-                  {{ field }}
-                {% endif %}
+                {{ field }}
 
                 {% if field.help_text %}
                   <small class="form-text text-muted">{{ field.help_text }}</small>
@@ -78,16 +64,16 @@
           </div>
 
           <div class="row">
-            <div class="col-md-6 form-group">
-              <input type="submit" value="Envoyer la demande" class="btn btn-primary">
+            <div class="col-12 col-md-8 col-lg-7 form-group">
+              <input type="submit" value="Reserver" class="btn btn-primary btn-block">
             </div>
           </div>
         </form>
       </div>
 
-      <div class="col-md-1"></div>
+      <div class="col-lg-1"></div>
 
-      <div class="col-md-5">
+      <div class="col-lg-5">
         <h3 class="mb-5">Ressource sélectionnée</h3>
 
         <div class="media d-block room mb-0">
@@ -187,7 +173,7 @@
       <div class="col-md-9 text-center element-animate">
         <h2>Votre demande est simple à envoyer</h2>
         <p class="lead mb-5">
-          Remplissez le formulaire, choisissez votre créneau et l’équipe GamedziRent traitera votre réservation.
+          Remplissez le formulaire, recevez votre lien sécurisé par email, puis confirmez la réservation par paiement.
         </p>
         <p>
           <a href="{% url 'reservations:resource_list' %}" class="btn btn-primary">
@@ -200,16 +186,4 @@
 </section>
 <!-- END section -->
 
-{% endblock %}
-
-{% block extra_js %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/js/bootstrap-datepicker.min.js"></script>
-
-<script>
-  $('#arrival_date, #departure_date, #id_start_date, #id_end_date').datepicker({
-    format: 'yyyy-mm-dd',
-    autoclose: true,
-    todayHighlight: true
-  });
-</script>
 {% endblock %}

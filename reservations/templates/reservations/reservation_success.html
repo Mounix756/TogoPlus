@@ -1,32 +1,46 @@
 {% extends 'reservations/base.html' %}
 
-{% block title %}Demande enregistrée - Togo+{% endblock %}
+{% block title %}Réservation confirmée - GamedziRent{% endblock %}
 
 {% block content %}
-<section class="success-screen">
-    <div class="success-card">
-        <p class="eyebrow">Réservation enregistrée</p>
-        <h1>Merci {{ reservation.customer_name }}</h1>
-        <p>Votre demande pour <strong>{{ reservation.resource.name }}</strong> a été enregistrée avec le statut <strong>{{ reservation.get_status_display }}</strong>.</p>
-        <dl class="info-list">
-            <div>
-                <dt>Début</dt>
-                <dd>{{ reservation.start_datetime|date:'d/m/Y H:i' }}</dd>
+<section class="site-section">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8 text-center">
+        <h1 class="mb-4">Réservation confirmée</h1>
+        <p class="lead">
+          Merci {{ reservation.customer_name }}. Votre paiement est confirmé et votre réservation est enregistrée.
+        </p>
+
+        <div class="media d-block room text-left mt-5">
+          <div class="media-body">
+            <h2>{{ reservation.resource.name }}</h2>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <strong>Début</strong><br>
+                {{ reservation.start_datetime|date:'d/m/Y H:i' }}
+              </div>
+              <div class="col-md-6 mb-3">
+                <strong>Fin</strong><br>
+                {{ reservation.end_datetime|date:'d/m/Y H:i' }}
+              </div>
+              <div class="col-md-6 mb-3">
+                <strong>Durée facturée</strong><br>
+                {{ reservation.billable_days }} jour{{ reservation.billable_days|pluralize }}
+              </div>
+              <div class="col-md-6 mb-3">
+                <strong>Montant payé</strong><br>
+                {{ reservation.total_amount }} XOF
+              </div>
             </div>
-            <div>
-                <dt>Fin</dt>
-                <dd>{{ reservation.end_datetime|date:'d/m/Y H:i' }}</dd>
-            </div>
-            <div>
-                <dt>Durée facturée</dt>
-                <dd>{{ reservation.billable_days }} jour{{ reservation.billable_days|pluralize }}</dd>
-            </div>
-            <div>
-                <dt>Montant estimé</dt>
-                <dd>{{ reservation.total_amount }} XOF</dd>
-            </div>
-        </dl>
-        <a class="button button-primary" href="{% url 'reservations:resource_list' %}">Voir d'autres ressources</a>
+          </div>
+        </div>
+
+        <p class="mt-5">
+          <a class="btn btn-primary" href="{% url 'reservations:resource_list' %}">Voir d'autres offres</a>
+        </p>
+      </div>
     </div>
+  </div>
 </section>
 {% endblock %}

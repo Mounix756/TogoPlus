@@ -143,6 +143,51 @@ Le backoffice applicatif est réservé aux utilisateurs `is_staff`.
 
 L'administration Django native reste disponible sur `/admin/`.
 
+## Flux de réservation et paiement
+
+Le parcours de réservation suit une logique réaliste :
+
+1. L'utilisateur remplit le formulaire sur la fiche d'une ressource.
+2. Le système vérifie la disponibilité du créneau avant toute suite.
+3. Si le créneau est disponible, les informations de réservation sont chiffrées dans un lien temporaire.
+4. Le lien de paiement est envoyé par email au client.
+5. Le client ouvre le lien, vérifie le récapitulatif et lance le paiement FedaPay.
+6. Au retour FedaPay, le système vérifie la transaction directement auprès de l'API FedaPay.
+7. La réservation est enregistrée dans la base uniquement si le paiement est réellement approuvé.
+
+Ce choix évite d'enregistrer de fausses réservations ou des réservations non payées.
+
+### Configuration FedaPay
+
+Les clés sont configurables par variables d'environnement dans un fichier `.env` local non versionné :
+
+```bash
+FEDAPAY_PUBLIC_KEY=your_fedapay_public_key
+FEDAPAY_SECRET_KEY=your_fedapay_secret_key
+FEDAPAY_ENVIRONMENT=live
+FEDAPAY_CURRENCY=XOF
+```
+
+Copiez `.env.example` vers `.env`, puis remplacez les clés par vos vraies clés FedaPay. Le fichier `.env` ne doit jamais être commité.
+
+Dans le flux actuel, l'application crée la transaction et génère le lien de paiement côté serveur. Cette partie utilise la **clé secrète**, car elle authentifie les appels serveur vers FedaPay. La **clé publique** est utile pour une intégration côté navigateur, par exemple avec Checkout.js. Elle est donc prévue dans `.env`, mais elle n'est pas nécessaire tant que le paiement passe par une redirection serveur sécurisée.
+
+### Configuration email
+
+Pour utiliser Gmail en SMTP, configurez `.env` ainsi :
+
+```bash
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your_gmail_address@gmail.com
+EMAIL_HOST_PASSWORD=your_gmail_app_password
+DEFAULT_FROM_EMAIL=Gamedzi-Rent <your_gmail_address@gmail.com>
+```
+
+Important : `EMAIL_HOST_PASSWORD` doit être un **mot de passe d'application Gmail**, pas le mot de passe normal du compte Google. Le compte Google doit avoir la validation en deux étapes activée pour générer ce mot de passe.
+
 ## Fonctionnalités prévues
 
 ### Gestion des comptes

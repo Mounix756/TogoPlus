@@ -1,4 +1,3 @@
-from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -260,44 +259,6 @@ class Reservation(TimeStampedModel):
             return timezone.localtime(value)
         return value
 
-    def _availability_error(self, availability_query):
-        start_datetime = self._as_local_datetime(self.start_datetime)
-        end_datetime = self._as_local_datetime(self.end_datetime)
-        current_date = start_datetime.date()
-        end_date = end_datetime.date()
-
-        while current_date <= end_date:
-            day_availabilities = availability_query.filter(weekday=current_date.weekday())
-
-            if not day_availabilities.exists():
-                return f'Aucune disponibilité n’est définie pour le {current_date:%d/%m/%Y}.'
-
-            if current_date == start_datetime.date() == end_datetime.date():
-                is_available = day_availabilities.filter(
-                    start_time__lte=start_datetime.time(),
-                    end_time__gte=end_datetime.time(),
-                ).exists()
-                if not is_available:
-                    return f'Le créneau demandé est en dehors des disponibilités du {current_date:%d/%m/%Y}.'
-            elif current_date == start_datetime.date():
-                is_available = day_availabilities.filter(
-                    start_time__lte=start_datetime.time(),
-                    end_time__gt=start_datetime.time(),
-                ).exists()
-                if not is_available:
-                    return f'L’heure de début est en dehors des disponibilités du {current_date:%d/%m/%Y}.'
-            elif current_date == end_datetime.date():
-                is_available = day_availabilities.filter(
-                    start_time__lt=end_datetime.time(),
-                    end_time__gte=end_datetime.time(),
-                ).exists()
-                if not is_available:
-                    return f'L’heure de fin est en dehors des disponibilités du {current_date:%d/%m/%Y}.'
-
-            current_date += timedelta(days=1)
-
-        return None
-
     def clean(self):
         errors = {}
 
@@ -326,23 +287,6 @@ class Reservation(TimeStampedModel):
 
             if overlap_query.exists():
                 errors['start_datetime'] = 'Cette ressource est déjà réservée sur ce créneau.'
-
-            blocked_query = UnavailablePeriod.objects.filter(
-                resource=self.resource,
-                starts_at__lt=self.end_datetime,
-                ends_at__gt=self.start_datetime,
-            )
-            if blocked_query.exists():
-                errors.setdefault('start_datetime', 'Cette ressource est indisponible sur ce créneau.')
-
-            availability_query = Availability.objects.filter(
-                resource=self.resource,
-                is_active=True,
-            )
-            if availability_query.exists():
-                availability_error = self._availability_error(availability_query)
-                if availability_error:
-                    errors.setdefault('start_datetime', availability_error)
 
         if errors:
             raise ValidationError(errors)

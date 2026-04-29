@@ -16,6 +16,7 @@ staticfiles/
 # Local configuration
 .env
 .env.*
+!.env.example
 
 # Editors and OS files
 .idea/

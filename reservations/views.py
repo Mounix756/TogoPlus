@@ -1,13 +1,30 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.exceptions import ValidationError
+from django.db import transaction as db_transaction
 from django.db.models import Count, Q, Sum
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 
+from .emails import send_reservation_payment_email
+from .fedapay import (
+    FedaPayClient,
+    FedaPayError,
+    extract_transaction,
+    extract_payment_url,
+    extract_transaction_id,
+    extract_transaction_status,
+    validate_transaction_matches_reservation,
+)
 from .forms import ReservationBackofficeForm, ReservationForm, ResourceForm
 from .models import Payment, Reservation, Resource, ResourceCategory
+from .tokens import (
+    ReservationTokenError,
+    build_reservation_payment_token,
+    load_reservation_from_token,
+)
 
 
 class FilteredPaginationMixin:
@@ -111,13 +128,155 @@ class ResourceDetailView(DetailView):
             user=request.user,
         )
         if form.is_valid():
-            reservation = form.save()
-            messages.success(request, 'Votre demande de réservation a bien été enregistrée.')
-            return redirect('reservations:reservation_success', pk=reservation.pk)
+            reservation = form.save(commit=False)
+            try:
+                reservation.full_clean()
+            except ValidationError as exc:
+                form.add_error(None, exc)
+                context = self.get_context_data(form=form)
+                return self.render_to_response(context)
+
+            token = build_reservation_payment_token(reservation)
+            payment_url = request.build_absolute_uri(
+                reverse('reservations:reservation_payment', kwargs={'token': token})
+            )
+
+            try:
+                send_reservation_payment_email(reservation, payment_url)
+            except Exception:
+                form.add_error(
+                    None,
+                    'La réservation est disponible, mais l’email de paiement n’a pas pu être envoyé.',
+                )
+                context = self.get_context_data(form=form)
+                return self.render_to_response(context)
+
+            return redirect('reservations:reservation_email_sent')
 
         context = self.get_context_data(form=form)
-        messages.error(request, 'Veuillez corriger les informations du formulaire.')
         return self.render_to_response(context)
+
+
+class ReservationEmailSentView(TemplateView):
+    template_name = 'reservations/reservation_email_sent.html'
+
+
+class ReservationPaymentView(TemplateView):
+    template_name = 'reservations/reservation_payment.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        token = self.kwargs['token']
+        context['token'] = token
+        try:
+            context['reservation'] = load_reservation_from_token(token)
+        except (ReservationTokenError, Resource.DoesNotExist, ValidationError) as exc:
+            context['token_error'] = exc
+        return context
+
+    def post(self, request, *args, **kwargs):
+        token = kwargs['token']
+        try:
+            reservation = load_reservation_from_token(token)
+        except (ReservationTokenError, Resource.DoesNotExist, ValidationError) as exc:
+            context = self.get_context_data(**kwargs)
+            context['token_error'] = exc
+            return self.render_to_response(context)
+
+        if reservation.total_amount <= 0:
+            context = self.get_context_data(**kwargs)
+            context['payment_error'] = 'Le montant de cette réservation doit être supérieur à 0 XOF.'
+            return self.render_to_response(context)
+
+        callback_url = request.build_absolute_uri(
+            reverse('reservations:fedapay_callback', kwargs={'token': token})
+        )
+
+        try:
+            client = FedaPayClient()
+            transaction_data = client.create_transaction(reservation, callback_url)
+            transaction_id = extract_transaction_id(transaction_data)
+            payment_link_data = client.create_payment_link(transaction_id)
+            return redirect(extract_payment_url(payment_link_data))
+        except FedaPayError as exc:
+            context = self.get_context_data(**kwargs)
+            context['payment_error'] = exc
+            return self.render_to_response(context)
+
+
+class FedaPayCallbackView(TemplateView):
+    template_name = 'reservations/payment_result.html'
+
+    def get(self, request, *args, **kwargs):
+        token = kwargs['token']
+        transaction_id = request.GET.get('id')
+
+        if not transaction_id:
+            return self.render_to_response({
+                'payment_status': 'unknown',
+                'payment_error': 'Le paiement n’a pas retourné d’identifiant vérifiable.',
+            })
+
+        try:
+            client = FedaPayClient()
+            transaction_data = client.retrieve_transaction(transaction_id)
+        except FedaPayError as exc:
+            return self.render_to_response({
+                'payment_status': 'unknown',
+                'payment_error': exc,
+            })
+
+        status = extract_transaction_status(transaction_data)
+        if status != 'approved':
+            return self.render_to_response({
+                'payment_status': status,
+                'payment_error': 'Le paiement n’est pas approuvé. La réservation n’a pas été enregistrée.',
+            })
+
+        existing_payment = Payment.objects.filter(
+            provider='FedaPay',
+            provider_reference=str(transaction_id),
+        ).select_related('reservation').first()
+        if existing_payment:
+            return redirect('reservations:reservation_success', pk=existing_payment.reservation_id)
+
+        try:
+            reservation = load_reservation_from_token(token)
+        except (ReservationTokenError, Resource.DoesNotExist, ValidationError) as exc:
+            return self.render_to_response({
+                'payment_status': status,
+                'payment_error': exc,
+            })
+
+        try:
+            transaction = extract_transaction(transaction_data)
+            validate_transaction_matches_reservation(transaction, reservation)
+
+            with db_transaction.atomic():
+                reservation.status = Reservation.Status.CONFIRMED
+                reservation.full_clean()
+                reservation.save()
+                Payment.objects.create(
+                    reservation=reservation,
+                    amount=reservation.total_amount,
+                    currency='XOF',
+                    method=Payment.Method.OTHER,
+                    status=Payment.Status.SUCCEEDED,
+                    provider='FedaPay',
+                    provider_reference=str(transaction_id),
+                    paid_at=timezone.now(),
+                    metadata={
+                        'fedapay_status': status,
+                        'fedapay_transaction_id': str(transaction_id),
+                    },
+                )
+        except (FedaPayError, ValidationError) as exc:
+            return self.render_to_response({
+                'payment_status': status,
+                'payment_error': exc,
+            })
+
+        return redirect('reservations:reservation_success', pk=reservation.pk)
 
 
 class ReservationSuccessView(DetailView):
