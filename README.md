@@ -25,9 +25,8 @@ Fonctionnel à ce stade :
 - routage principal dans `config/urls.py` ;
 - interface d'administration Django disponible sur `/admin/` ;
 - base de données SQLite configurée en développement ;
-- fichiers ASGI/WSGI présents pour un futur déploiement.
-
-Les applications métier de réservation restent à créer.
+- fichiers ASGI/WSGI présents pour un futur déploiement ;
+- application métier `reservations` créée avec les modèles principaux.
 
 ## Stack technique
 
@@ -41,18 +40,46 @@ Les applications métier de réservation restent à créer.
 
 ```text
 TogoPlus/
+├── .git/
+├── .gitignore
+├── README.md
 ├── manage.py
 ├── db.sqlite3
-└── config/
+├── config/
+│   ├── __init__.py
+│   ├── asgi.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+└── reservations/
     ├── __init__.py
-    ├── asgi.py
-    ├── settings.py
-    ├── urls.py
-    ├── wsgi.py
-    └── README.md
+    ├── admin.py
+    ├── apps.py
+    ├── models.py
+    ├── tests.py
+    └── migrations/
+        └── __init__.py
 ```
 
-> Note : le dépôt Git est actuellement initialisé dans le dossier `config/`, tandis que le fichier `manage.py` se trouve dans le dossier parent du projet. Les commandes Django doivent donc être lancées depuis le dossier racine `TogoPlus/`.
+Cette organisation suit une structure Django classique :
+
+- `manage.py` est le point d'entrée des commandes Django ;
+- `config/` contient la configuration globale du projet ;
+- `reservations/` contient le code métier de l'application de réservation ;
+- `.gitignore` évite de versionner les fichiers générés localement comme `db.sqlite3`, les environnements virtuels et les caches Python.
+
+Le dépôt Git est placé à la racine du projet, au même niveau que `manage.py`, afin de suivre tout le projet Django.
+
+## Rôle du dossier `config`
+
+Le dossier `config/` est normal dans un projet Django. Il ne doit pas contenir la logique métier, mais uniquement la configuration globale :
+
+- `settings.py` configure Django, les applications installées, la base de données, la sécurité et les fichiers statiques ;
+- `urls.py` déclare les routes principales du projet ;
+- `asgi.py` sert de point d'entrée pour un déploiement ASGI ;
+- `wsgi.py` sert de point d'entrée pour un déploiement WSGI.
+
+Les fonctionnalités de réservation restent dans l'application `reservations/`.
 
 ## Installation locale
 
@@ -150,7 +177,7 @@ Une ressource ne peut pas avoir deux réservations confirmées qui se chevauchen
 
 ## Commandes utiles
 
-Créer une application Django :
+Créer une nouvelle application Django :
 
 ```bash
 python manage.py startapp reservations
@@ -177,7 +204,7 @@ python manage.py check
 
 ## Bonnes pratiques recommandées
 
-- déplacer la racine Git au niveau du dossier `TogoPlus/` pour inclure `manage.py`, les futures apps et le README principal ;
+- conserver la racine Git au niveau du dossier `TogoPlus/` pour inclure `manage.py`, `config/`, les applications métier et le README principal ;
 - ajouter un fichier `requirements.txt` ou `pyproject.toml` pour figer les dépendances ;
 - utiliser des variables d'environnement pour `SECRET_KEY`, `DEBUG` et les paramètres sensibles ;
 - séparer les paramètres de développement et de production avant tout déploiement ;
@@ -186,12 +213,12 @@ python manage.py check
 
 ## Roadmap
 
-1. Créer l'application `reservations`.
-2. Définir les modèles métier : ressources, disponibilités, réservations.
-3. Ajouter les vues et templates pour consulter et réserver.
-4. Implémenter la validation anti-chevauchement des créneaux.
-5. Connecter les modèles à l'administration Django.
-6. Ajouter les tests unitaires sur les règles de réservation.
+1. Créer l'application `reservations`. Fait.
+2. Définir les modèles métier : ressources, disponibilités, réservations. Fait.
+3. Connecter les modèles à l'administration Django. Fait.
+4. Ajouter les vues et templates pour consulter et réserver.
+5. Implémenter les formulaires de création de réservation.
+6. Ajouter les tests unitaires complets sur les règles de réservation.
 7. Préparer l'extension paiement en ligne.
 
 ## Auteur
