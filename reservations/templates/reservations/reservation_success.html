@@ -1,0 +1,32 @@
+{% extends 'reservations/base.html' %}
+
+{% block title %}Demande enregistrée - Togo+{% endblock %}
+
+{% block content %}
+<section class="success-screen">
+    <div class="success-card">
+        <p class="eyebrow">Réservation enregistrée</p>
+        <h1>Merci {{ reservation.customer_name }}</h1>
+        <p>Votre demande pour <strong>{{ reservation.resource.name }}</strong> a été enregistrée avec le statut <strong>{{ reservation.get_status_display }}</strong>.</p>
+        <dl class="info-list">
+            <div>
+                <dt>Début</dt>
+                <dd>{{ reservation.start_datetime|date:'d/m/Y H:i' }}</dd>
+            </div>
+            <div>
+                <dt>Fin</dt>
+                <dd>{{ reservation.end_datetime|date:'d/m/Y H:i' }}</dd>
+            </div>
+            <div>
+                <dt>Durée facturée</dt>
+                <dd>{{ reservation.billable_days }} jour{{ reservation.billable_days|pluralize }}</dd>
+            </div>
+            <div>
+                <dt>Montant estimé</dt>
+                <dd>{{ reservation.total_amount }} XOF</dd>
+            </div>
+        </dl>
+        <a class="button button-primary" href="{% url 'reservations:resource_list' %}">Voir d'autres ressources</a>
+    </div>
+</section>
+{% endblock %}

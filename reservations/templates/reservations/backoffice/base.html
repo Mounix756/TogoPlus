@@ -1,0 +1,23 @@
+{% extends 'reservations/base.html' %}
+
+{% block content %}
+<section class="admin-layout">
+    <aside class="admin-sidebar">
+        <a class="brand admin-brand" href="{% url 'reservations:backoffice_dashboard' %}">
+            <span class="brand-mark">T+</span>
+            <span>Backoffice</span>
+        </a>
+        <nav>
+            <a href="{% url 'reservations:backoffice_dashboard' %}">Tableau de bord</a>
+            <a href="{% url 'reservations:backoffice_resources' %}">Ressources</a>
+            <a href="{% url 'reservations:backoffice_reservations' %}">Réservations</a>
+            <a href="{% url 'reservations:backoffice_payments' %}">Paiements</a>
+            <a href="{% url 'reservations:home' %}">Vitrine</a>
+            <a href="{% url 'admin:index' %}">Admin Django</a>
+        </nav>
+    </aside>
+    <div class="admin-main">
+        {% block backoffice_content %}{% endblock %}
+    </div>
+</section>
+{% endblock %}

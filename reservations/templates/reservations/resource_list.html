@@ -1,0 +1,195 @@
+{% extends 'reservations/base.html' %}
+{% load static %}
+
+{% block title %}Catalogue - GamedziRent{% endblock %}
+
+{% block content %}
+
+<section class="site-hero site-hero-innerpage overlay" data-stellar-background-ratio="0.5" style="background-image: url('{% static "reservations/images/big_image_1.jpg" %}');">
+  <div class="container">
+    <div class="row align-items-center site-hero-inner justify-content-center">
+      <div class="col-md-12 text-center">
+
+        <div class="mb-5 element-animate">
+          <h1>Nos offres</h1>
+          <p>Découvrez les salles, services et équipements disponibles à la réservation avec GamedziRent.</p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+<!-- END section -->
+
+<section class="site-section">
+  <div class="container">
+
+    <div class="row mb-5">
+      <div class="col-md-12 heading-wrap text-center">
+        <h4 class="sub-heading">Catalogue</h4>
+        <h2 class="heading">Ressources réservables</h2>
+      </div>
+    </div>
+
+    <form method="get" class="mb-5">
+      <div class="row">
+
+        <div class="col-md-4 form-group">
+          <label for="q">Recherche</label>
+          <input
+            type="search"
+            id="q"
+            name="q"
+            value="{{ filters.q }}"
+            class="form-control"
+            placeholder="Salle, lieu, service..."
+          >
+        </div>
+
+        <div class="col-md-3 form-group">
+          <label for="type">Type</label>
+          <select name="type" id="type" class="form-control">
+            <option value="">Tous les types</option>
+            {% for value, label in resource_types %}
+              <option value="{{ value }}" {% if filters.type == value %}selected{% endif %}>
+                {{ label }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3 form-group">
+          <label for="category">Catégorie</label>
+          <select name="category" id="category" class="form-control">
+            <option value="">Toutes les catégories</option>
+            {% for category in categories %}
+              <option value="{{ category.slug }}" {% if filters.category == category.slug %}selected{% endif %}>
+                {{ category.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-2 form-group d-flex align-items-end">
+          <input type="submit" value="Filtrer" class="btn btn-primary btn-block">
+        </div>
+
+      </div>
+    </form>
+
+    <div class="row">
+
+      {% for resource in resources %}
+        <div class="col-md-4 mb-4">
+          <div class="media d-block room mb-0">
+            <figure>
+              {% if forloop.counter|divisibleby:"3" %}
+                <img src="{% static 'reservations/images/img_1.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+              {% elif forloop.counter|divisibleby:"2" %}
+                <img src="{% static 'reservations/images/img_3.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+              {% else %}
+                <img src="{% static 'reservations/images/img_2.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+              {% endif %}
+
+              <div class="overlap-text">
+                <span>
+                  {{ resource.get_resource_type_display }}
+                  <span class="ion-ios-star"></span>
+                  <span class="ion-ios-star"></span>
+                  <span class="ion-ios-star"></span>
+                </span>
+              </div>
+            </figure>
+
+            <div class="media-body">
+              <h3 class="mt-0">
+                <a href="{% url 'reservations:resource_detail' resource.slug %}">
+                  {{ resource.name }}
+                </a>
+              </h3>
+
+              <ul class="room-specs">
+                <li>
+                  <span class="ion-ios-people-outline"></span>
+                  {{ resource.capacity }} personnes
+                </li>
+                <li>
+                  <span class="ion-ios-pricetag-outline"></span>
+                  {{ resource.price }} XOF / jour
+                </li>
+              </ul>
+
+              <p>
+                {{ resource.description|default:'Ressource disponible à la réservation sur GamedziRent.'|truncatewords:24 }}
+              </p>
+
+              {% if resource.location %}
+                <p>
+                  <span class="ion-ios-location-outline"></span>
+                  {{ resource.location }}
+                </p>
+              {% endif %}
+
+              <p>
+                <a href="{% url 'reservations:resource_detail' resource.slug %}" class="btn btn-primary btn-sm">
+                  Voir les détails
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+
+      {% empty %}
+        <div class="col-md-12">
+          <div class="heading-wrap text-center element-animate">
+            <h4 class="sub-heading">Aucun résultat</h4>
+            <h2 class="heading">Aucune ressource trouvée</h2>
+            <p class="mb-5">
+              Essayez de modifier les filtres ou ajoutez de nouvelles ressources depuis le backoffice.
+            </p>
+
+            {% if request.user.is_staff %}
+              <p>
+                <a href="{% url 'reservations:backoffice_resource_create' %}" class="btn btn-primary btn-sm">
+                  Ajouter une ressource
+                </a>
+              </p>
+            {% else %}
+              <p>
+                <a href="{% url 'reservations:home' %}" class="btn btn-primary btn-sm">
+                  Retour à l’accueil
+                </a>
+              </p>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+
+    </div>
+
+    {% include 'reservations/pagination.html' %}
+
+  </div>
+</section>
+<!-- END section -->
+
+<section class="section-cover" data-stellar-background-ratio="0.5" style="background-image: url('{% static "reservations/images/img_5.jpg" %}');">
+  <div class="container">
+    <div class="row justify-content-center align-items-center intro">
+      <div class="col-md-9 text-center element-animate">
+        <h2>Trouvez l’offre qui correspond à votre besoin</h2>
+        <p class="lead mb-5">
+          GamedziRent vous aide à choisir une salle, un service ou un équipement adapté à votre événement.
+        </p>
+        <p>
+          <a href="{% url 'reservations:resource_list' %}" class="btn btn-primary">
+            Voir toutes les offres
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- END section -->
+
+{% endblock %}

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -237,8 +238,65 @@ class Reservation(TimeStampedModel):
         return self.end_datetime - self.start_datetime
 
     @property
+    def billable_days(self):
+        if not self.start_datetime or not self.end_datetime:
+            return 0
+
+        start_datetime = self._as_local_datetime(self.start_datetime)
+        end_datetime = self._as_local_datetime(self.end_datetime)
+        return (end_datetime.date() - start_datetime.date()).days + 1
+
+    @property
     def is_paid(self):
         return self.payments.filter(status=Payment.Status.SUCCEEDED).exists()
+
+    def calculate_total_amount(self):
+        if not self.resource_id:
+            return Decimal('0.00')
+        return self.resource.price * max(self.billable_days, 1)
+
+    def _as_local_datetime(self, value):
+        if timezone.is_aware(value):
+            return timezone.localtime(value)
+        return value
+
+    def _availability_error(self, availability_query):
+        start_datetime = self._as_local_datetime(self.start_datetime)
+        end_datetime = self._as_local_datetime(self.end_datetime)
+        current_date = start_datetime.date()
+        end_date = end_datetime.date()
+
+        while current_date <= end_date:
+            day_availabilities = availability_query.filter(weekday=current_date.weekday())
+
+            if not day_availabilities.exists():
+                return f'Aucune disponibilité n’est définie pour le {current_date:%d/%m/%Y}.'
+
+            if current_date == start_datetime.date() == end_datetime.date():
+                is_available = day_availabilities.filter(
+                    start_time__lte=start_datetime.time(),
+                    end_time__gte=end_datetime.time(),
+                ).exists()
+                if not is_available:
+                    return f'Le créneau demandé est en dehors des disponibilités du {current_date:%d/%m/%Y}.'
+            elif current_date == start_datetime.date():
+                is_available = day_availabilities.filter(
+                    start_time__lte=start_datetime.time(),
+                    end_time__gt=start_datetime.time(),
+                ).exists()
+                if not is_available:
+                    return f'L’heure de début est en dehors des disponibilités du {current_date:%d/%m/%Y}.'
+            elif current_date == end_datetime.date():
+                is_available = day_availabilities.filter(
+                    start_time__lt=end_datetime.time(),
+                    end_time__gte=end_datetime.time(),
+                ).exists()
+                if not is_available:
+                    return f'L’heure de fin est en dehors des disponibilités du {current_date:%d/%m/%Y}.'
+
+            current_date += timedelta(days=1)
+
+        return None
 
     def clean(self):
         errors = {}
@@ -254,6 +312,7 @@ class Reservation(TimeStampedModel):
             self.resource_id
             and self.start_datetime
             and self.end_datetime
+            and self.end_datetime > self.start_datetime
             and self.status in self.BLOCKING_STATUSES
         ):
             overlap_query = Reservation.objects.filter(
@@ -274,31 +333,16 @@ class Reservation(TimeStampedModel):
                 ends_at__gt=self.start_datetime,
             )
             if blocked_query.exists():
-                errors['start_datetime'] = 'Cette ressource est indisponible sur ce créneau.'
+                errors.setdefault('start_datetime', 'Cette ressource est indisponible sur ce créneau.')
 
             availability_query = Availability.objects.filter(
                 resource=self.resource,
                 is_active=True,
             )
             if availability_query.exists():
-                start_datetime = self.start_datetime
-                end_datetime = self.end_datetime
-
-                if timezone.is_aware(start_datetime):
-                    start_datetime = timezone.localtime(start_datetime)
-                if timezone.is_aware(end_datetime):
-                    end_datetime = timezone.localtime(end_datetime)
-
-                if start_datetime.date() != end_datetime.date():
-                    errors['end_datetime'] = 'Une réservation doit rester sur une même journée.'
-                else:
-                    is_inside_opening_hours = availability_query.filter(
-                        weekday=start_datetime.weekday(),
-                        start_time__lte=start_datetime.time(),
-                        end_time__gte=end_datetime.time(),
-                    ).exists()
-                    if not is_inside_opening_hours:
-                        errors['start_datetime'] = 'Ce créneau est en dehors des disponibilités de la ressource.'
+                availability_error = self._availability_error(availability_query)
+                if availability_error:
+                    errors.setdefault('start_datetime', availability_error)
 
         if errors:
             raise ValidationError(errors)

@@ -1,0 +1,56 @@
+{% extends 'reservations/backoffice/base.html' %}
+
+{% block title %}Réservations - Backoffice{% endblock %}
+
+{% block backoffice_content %}
+<div class="admin-heading">
+    <div>
+        <p class="eyebrow">Planning</p>
+        <h1>Réservations</h1>
+    </div>
+</div>
+
+<form class="filter-bar admin-filter" method="get">
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="Client, email, ressource">
+    <select name="status">
+        <option value="">Tous les statuts</option>
+        {% for value, label in statuses %}
+            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button class="button button-primary" type="submit">Filtrer</button>
+</form>
+
+<section class="admin-panel">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Client</th>
+                    <th>Ressource</th>
+                    <th>Début</th>
+                    <th>Fin</th>
+                    <th>Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reservation in reservations %}
+                    <tr>
+                        <td>{{ reservation.customer_name }}</td>
+                        <td>{{ reservation.resource.name }}</td>
+                        <td>{{ reservation.start_datetime|date:'d/m/Y H:i' }}</td>
+                        <td>{{ reservation.end_datetime|date:'d/m/Y H:i' }}</td>
+                        <td><span class="status-pill">{{ reservation.get_status_display }}</span></td>
+                        <td><a href="{% url 'reservations:backoffice_reservation_update' reservation.pk %}">Modifier</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">Aucune réservation.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% include 'reservations/pagination.html' %}
+{% endblock %}

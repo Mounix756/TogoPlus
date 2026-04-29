@@ -1,0 +1,178 @@
+{% load static %}
+<!doctype html>
+<html lang="fr">
+  <head>
+    <title>{% block title %}Gamedzi-Rent{% endblock %}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link href="https://fonts.googleapis.com/css?family=Playfair+Display:400,700,900|Rubik:300,400,700" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'reservations/css/bootstrap.css' %}">
+    <link rel="stylesheet" href="{% static 'reservations/css/animate.css' %}">
+    <link rel="stylesheet" href="{% static 'reservations/css/owl.carousel.min.css' %}">
+
+    <link rel="stylesheet" href="{% static 'reservations/fonts/ionicons/css/ionicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'reservations/fonts/fontawesome/css/font-awesome.min.css' %}">
+    <link rel="stylesheet" href="{% static 'reservations/css/magnific-popup.css' %}">
+
+    <!-- Theme Style -->
+    <link rel="stylesheet" href="{% static 'reservations/css/style.css' %}">
+
+    {% block extra_css %}{% endblock %}
+  </head>
+
+  <body>
+
+    <header role="banner">
+
+      <nav class="navbar navbar-expand-md navbar-dark bg-light">
+        <div class="container">
+          <a class="navbar-brand" href="{% url 'reservations:home' %}">Gamedzi-Rent</a>
+
+          <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExample05" aria-controls="navbarsExample05" aria-expanded="false" aria-label="Afficher le menu">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+
+          <div class="collapse navbar-collapse navbar-light" id="navbarsExample05">
+            <ul class="navbar-nav ml-auto pl-lg-5 pl-0">
+
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'reservations:home' %}">Accueil</a>
+              </li>
+
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="{% url 'reservations:resource_list' %}" id="dropdown04" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  Nos offres
+                </a>
+
+                <div class="dropdown-menu" aria-labelledby="dropdown04">
+                <a class="dropdown-item" href="{% url 'reservations:resource_list' %}">
+                    Toutes les offres
+                </a>
+
+                <a class="dropdown-item" href="{% url 'reservations:resource_list' %}?type=room">
+                    Salles
+                </a>
+
+                <a class="dropdown-item" href="{% url 'reservations:resource_list' %}?type=service">
+                    Services
+                </a>
+
+                <a class="dropdown-item" href="{% url 'reservations:resource_list' %}?type=equipment">
+                    Équipements
+                </a>
+                </div>
+              </li>
+
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'reservations:resource_list' %}">Catalogue</a>
+              </li>
+
+              <!-- {% if request.user.is_staff %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'reservations:backoffice_dashboard' %}">Backoffice</a>
+                </li>
+              {% endif %} -->
+
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'reservations:contact' %}">Contact</a>
+              </li>
+
+              <li class="nav-item cta">
+                <a class="nav-link" href="{% url 'reservations:resource_list' %}">
+                  <span>Réserver</span>
+                </a>
+              </li>
+
+            </ul>
+          </div>
+        </div>
+      </nav>
+    </header>
+    <!-- END header -->
+
+    {% if messages %}
+      <div class="container mt-3">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="row mb-5">
+
+          <div class="col-md-4">
+            <h3>Assistance</h3>
+            <p>Besoin d’aide pour une réservation ? Notre équipe vous accompagne.</p>
+            <p class="lead">
+              <a href="tel:+22897772926">+228 97 77 29 26</a>
+            </p>
+          </div>
+
+          <div class="col-md-4">
+            <h3>Suivez-nous</h3>
+            <p>Découvrez nos nouveaux espaces, services disponibles et offres de réservation.</p>
+            <p>
+              <a href="#" class="pl-0 p-3"><span class="fa fa-facebook"></span></a>
+              <a href="#" class="p-3"><span class="fa fa-twitter"></span></a>
+              <a href="#" class="p-3"><span class="fa fa-instagram"></span></a>
+              <a href="#" class="p-3"><span class="fa fa-youtube-play"></span></a>
+            </p>
+          </div>
+
+          <div class="col-md-4">
+            <h3>Gamedzi-Rent</h3>
+            <p>Une solution simple pour présenter, réserver et gérer des espaces, services et équipements.</p>
+
+            <form action="#" class="subscribe">
+              <div class="form-group">
+                <button type="submit">
+                  <span class="ion-ios-arrow-thin-right"></span>
+                </button>
+                <input type="email" class="form-control" placeholder="Votre adresse email">
+              </div>
+            </form>
+          </div>
+
+        </div>
+
+        <div class="row justify-content-center">
+          <div class="col-md-7 text-center">
+            &copy; {% now "Y" %} Gamedzi-Rent. Tous droits réservés.
+          </div>
+        </div>
+      </div>
+    </footer>
+    <!-- END footer -->
+
+    <!-- loader -->
+    <div id="loader" class="show fullscreen">
+      <svg class="circular" width="48px" height="48px">
+        <circle class="path-bg" cx="24" cy="24" r="22" fill="none" stroke-width="4" stroke="#eeeeee"/>
+        <circle class="path" cx="24" cy="24" r="22" fill="none" stroke-width="4" stroke-miterlimit="10" stroke="#f4b214"/>
+      </svg>
+    </div>
+
+    <script src="{% static 'reservations/js/jquery-3.2.1.min.js' %}"></script>
+    <script src="{% static 'reservations/js/jquery-migrate-3.0.0.js' %}"></script>
+    <script src="{% static 'reservations/js/popper.min.js' %}"></script>
+    <script src="{% static 'reservations/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'reservations/js/owl.carousel.min.js' %}"></script>
+    <script src="{% static 'reservations/js/jquery.waypoints.min.js' %}"></script>
+    <script src="{% static 'reservations/js/jquery.stellar.min.js' %}"></script>
+
+    <script src="{% static 'reservations/js/jquery.magnific-popup.min.js' %}"></script>
+    <script src="{% static 'reservations/js/magnific-popup-options.js' %}"></script>
+
+    {% block extra_js %}{% endblock %}
+
+    <script src="{% static 'reservations/js/main.js' %}"></script>
+  </body>
+</html>

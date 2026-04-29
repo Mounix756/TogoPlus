@@ -1,0 +1,215 @@
+{% extends 'reservations/base.html' %}
+{% load static %}
+
+{% block title %}{{ resource.name }} - GamedziRent{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.min.css">
+{% endblock %}
+
+{% block content %}
+
+<section class="site-hero site-hero-innerpage overlay" data-stellar-background-ratio="0.5" style="background-image: url('{% static "reservations/images/big_image_1.jpg" %}');">
+  <div class="container">
+    <div class="row align-items-center site-hero-inner justify-content-center">
+      <div class="col-md-12 text-center">
+
+        <div class="mb-5 element-animate">
+          <h1>Réservation</h1>
+          <p>
+            {{ resource.name }} — {{ resource.description|default:'Consultez les informations de cette ressource et envoyez votre demande de réservation.' }}
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+<!-- END section -->
+
+<section class="site-section">
+  <div class="container">
+    <div class="row">
+
+      <div class="col-md-6">
+        <h2 class="mb-5">Formulaire de réservation</h2>
+
+        <form method="post">
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          <div class="row">
+            {% for field in form %}
+              <div class="{% if field.name == 'notes' or field.name == 'message' %}col-md-12{% else %}col-sm-6{% endif %} form-group">
+
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+
+                {% if field.name == 'start_date' or field.name == 'starts_at' or field.name == 'arrival_date' %}
+                  <div style="position: relative;">
+                    <span class="fa fa-calendar icon" style="position: absolute; right: 10px; top: 10px;"></span>
+                    {{ field }}
+                  </div>
+                {% elif field.name == 'end_date' or field.name == 'ends_at' or field.name == 'departure_date' %}
+                  <div style="position: relative;">
+                    <span class="fa fa-calendar icon" style="position: absolute; right: 10px; top: 10px;"></span>
+                    {{ field }}
+                  </div>
+                {% else %}
+                  {{ field }}
+                {% endif %}
+
+                {% if field.help_text %}
+                  <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+
+                {% if field.errors %}
+                  <div class="text-danger mt-1">
+                    {{ field.errors|join:', ' }}
+                  </div>
+                {% endif %}
+
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 form-group">
+              <input type="submit" value="Envoyer la demande" class="btn btn-primary">
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="col-md-1"></div>
+
+      <div class="col-md-5">
+        <h3 class="mb-5">Ressource sélectionnée</h3>
+
+        <div class="media d-block room mb-0">
+          <figure>
+            <img src="{% static 'reservations/images/img_1.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+            <div class="overlap-text">
+              <span>
+                {{ resource.get_resource_type_display }}
+                <span class="ion-ios-star"></span>
+                <span class="ion-ios-star"></span>
+                <span class="ion-ios-star"></span>
+              </span>
+            </div>
+          </figure>
+
+          <div class="media-body">
+            <h3 class="mt-0">
+              <a href="#">{{ resource.name }}</a>
+            </h3>
+
+            <ul class="room-specs">
+              <li>
+                <span class="ion-ios-people-outline"></span>
+                {{ resource.capacity }} personnes
+              </li>
+              <li>
+                <span class="ion-ios-pricetag-outline"></span>
+                {{ resource.price }} XOF / jour
+              </li>
+            </ul>
+
+            <p>
+              {{ resource.description|default:'Cette ressource est disponible à la réservation sur GamedziRent.' }}
+            </p>
+
+            <p>
+              {% if resource.requires_payment %}
+                Paiement requis pour confirmer la réservation.
+              {% else %}
+                Paiement optionnel selon les conditions de réservation.
+              {% endif %}
+            </p>
+
+            <hr>
+
+            <h4>Informations</h4>
+            <ul class="room-specs">
+              <li>
+                <span class="ion-ios-folder-outline"></span>
+                {{ resource.category|default:'Non classée' }}
+              </li>
+              <li>
+                <span class="ion-ios-location-outline"></span>
+                {{ resource.location|default:'Lieu à préciser' }}
+              </li>
+            </ul>
+
+            <h4 class="mt-4">Disponibilités</h4>
+
+            {% for availability in resource.availabilities.all %}
+              {% if availability.is_active %}
+                <p class="mb-1">
+                  {{ availability.get_weekday_display }} :
+                  {{ availability.start_time }} - {{ availability.end_time }}
+                </p>
+              {% endif %}
+            {% empty %}
+              <p>Aucune disponibilité spécifique n’a encore été définie.</p>
+            {% endfor %}
+
+            {% if upcoming_unavailable_periods %}
+              <h4 class="mt-4">Périodes indisponibles</h4>
+
+              {% for period in upcoming_unavailable_periods %}
+                <p class="mb-1">
+                  {{ period.starts_at|date:'d/m/Y H:i' }} -
+                  {{ period.ends_at|date:'d/m/Y H:i' }}
+                  {% if period.reason %}
+                    · {{ period.reason }}
+                  {% endif %}
+                </p>
+              {% endfor %}
+            {% endif %}
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+<!-- END section -->
+
+<section class="section-cover" data-stellar-background-ratio="0.5" style="background-image: url('{% static "reservations/images/img_5.jpg" %}');">
+  <div class="container">
+    <div class="row justify-content-center align-items-center intro">
+      <div class="col-md-9 text-center element-animate">
+        <h2>Votre demande est simple à envoyer</h2>
+        <p class="lead mb-5">
+          Remplissez le formulaire, choisissez votre créneau et l’équipe GamedziRent traitera votre réservation.
+        </p>
+        <p>
+          <a href="{% url 'reservations:resource_list' %}" class="btn btn-primary">
+            Voir les autres offres
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- END section -->
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/js/bootstrap-datepicker.min.js"></script>
+
+<script>
+  $('#arrival_date, #departure_date, #id_start_date, #id_end_date').datepicker({
+    format: 'yyyy-mm-dd',
+    autoclose: true,
+    todayHighlight: true
+  });
+</script>
+{% endblock %}

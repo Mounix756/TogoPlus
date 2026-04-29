@@ -1,8 +1,8 @@
-# Togo+
+# GamedziRent
 
-**Togo+** est une application web Django de réservation de services ou de salles, conçue pour gérer des créneaux disponibles, des demandes de réservation et, à terme, le paiement en ligne.
+**GamedziRent** est une application web Django de réservation de services ou de salles, conçue pour gérer des créneaux disponibles, des demandes de réservation et, à terme, le paiement en ligne.
 
-Le nom public du projet est **Togo+**. Le nom technique recommandé pour les dossiers, dépôts ou identifiants est **TogoPlus**.
+Le nom public du projet est **GamedziRent**. Le nom technique recommandé pour les dossiers, dépôts ou identifiants est **GamedziRent**.
 
 ## Contexte du projet
 
@@ -39,7 +39,7 @@ Fonctionnel à ce stade :
 ## Structure actuelle
 
 ```text
-TogoPlus/
+GamedziRent/
 ├── .git/
 ├── .gitignore
 ├── README.md
@@ -83,7 +83,7 @@ Les fonctionnalités de réservation restent dans l'application `reservations/`.
 
 ## Installation locale
 
-Depuis le dossier `TogoPlus/` :
+Depuis le dossier `GamedziRent/` :
 
 ```bash
 python -m venv .venv
@@ -122,6 +122,27 @@ L'administration Django sera accessible à l'adresse :
 http://127.0.0.1:8000/admin/
 ```
 
+## Pages disponibles
+
+### Vitrine
+
+- `/` : page d'accueil de GamedziRent ;
+- `/ressources/` : catalogue public des salles, services et équipements ;
+- `/ressources/<slug>/` : fiche détaillée d'une ressource avec formulaire de réservation ;
+- `/reservations/<id>/merci/` : confirmation après envoi d'une demande.
+
+### Backoffice
+
+Le backoffice applicatif est réservé aux utilisateurs `is_staff`.
+
+- `/backoffice/` : tableau de bord ;
+- `/backoffice/ressources/` : gestion des ressources ;
+- `/backoffice/ressources/ajouter/` : création d'une ressource ;
+- `/backoffice/reservations/` : suivi des réservations ;
+- `/backoffice/paiements/` : suivi des paiements.
+
+L'administration Django native reste disponible sur `/admin/`.
+
 ## Fonctionnalités prévues
 
 ### Gestion des comptes
@@ -146,8 +167,9 @@ http://127.0.0.1:8000/admin/
 ### Gestion des réservations
 
 - choix d'une ressource ;
-- sélection d'une date et d'un créneau horaire ;
+- sélection d'une date de début et d'une date de fin, y compris sur plusieurs jours ;
 - validation de la disponibilité avant enregistrement ;
+- blocage automatique des conflits avec les réservations en attente ou confirmées ;
 - statut de réservation : en attente, confirmée, annulée ou terminée ;
 - notification ou récapitulatif de réservation.
 
@@ -174,6 +196,8 @@ Règle centrale :
 ```text
 Une ressource ne peut pas avoir deux réservations confirmées qui se chevauchent sur le même créneau.
 ```
+
+Les réservations peuvent couvrir plusieurs jours. Lorsqu'une ressource possède des disponibilités hebdomadaires, chaque jour concerné par la réservation doit avoir au moins une disponibilité active. L'heure de début doit être compatible avec le premier jour, et l'heure de fin doit être compatible avec le dernier jour.
 
 ## Commandes utiles
 
@@ -204,7 +228,7 @@ python manage.py check
 
 ## Bonnes pratiques recommandées
 
-- conserver la racine Git au niveau du dossier `TogoPlus/` pour inclure `manage.py`, `config/`, les applications métier et le README principal ;
+- conserver la racine Git au niveau du dossier `GamedziRent/` pour inclure `manage.py`, `config/`, les applications métier et le README principal ;
 - ajouter un fichier `requirements.txt` ou `pyproject.toml` pour figer les dépendances ;
 - utiliser des variables d'environnement pour `SECRET_KEY`, `DEBUG` et les paramètres sensibles ;
 - séparer les paramètres de développement et de production avant tout déploiement ;

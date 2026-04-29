@@ -1,0 +1,56 @@
+{% extends 'reservations/backoffice/base.html' %}
+
+{% block title %}Ressources - Backoffice{% endblock %}
+
+{% block backoffice_content %}
+<div class="admin-heading">
+    <div>
+        <p class="eyebrow">Gestion</p>
+        <h1>Ressources</h1>
+    </div>
+    <a class="button button-primary" href="{% url 'reservations:backoffice_resource_create' %}">Ajouter</a>
+</div>
+
+<form class="filter-bar admin-filter" method="get">
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="Rechercher">
+    <select name="status">
+        <option value="">Tous les statuts</option>
+        <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Actives</option>
+        <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactives</option>
+    </select>
+    <button class="button button-primary" type="submit">Filtrer</button>
+</form>
+
+<section class="admin-panel">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Type</th>
+                    <th>Capacité</th>
+                    <th>Prix</th>
+                    <th>Statut</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for resource in resources %}
+                    <tr>
+                        <td>{{ resource.name }}</td>
+                        <td>{{ resource.get_resource_type_display }}</td>
+                        <td>{{ resource.capacity }}</td>
+                        <td>{{ resource.price }} XOF</td>
+                        <td><span class="status-pill">{{ resource.is_active|yesno:'Active,Inactive' }}</span></td>
+                        <td><a href="{% url 'reservations:backoffice_resource_update' resource.pk %}">Modifier</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">Aucune ressource.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% include 'reservations/pagination.html' %}
+{% endblock %}

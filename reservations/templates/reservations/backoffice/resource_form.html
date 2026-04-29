@@ -1,0 +1,34 @@
+{% extends 'reservations/backoffice/base.html' %}
+
+{% block title %}Ressource - Backoffice{% endblock %}
+
+{% block backoffice_content %}
+<div class="admin-heading">
+    <div>
+        <p class="eyebrow">Ressource</p>
+        <h1>{% if object %}Modifier {{ object.name }}{% else %}Nouvelle ressource{% endif %}</h1>
+    </div>
+</div>
+
+<section class="admin-panel">
+    <form method="post" class="form-grid">
+        {% csrf_token %}
+        {% for field in form %}
+            <div class="form-field {% if field.name == 'description' %}full{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                    <small>{{ field.help_text }}</small>
+                {% endif %}
+                {% if field.errors %}
+                    <p class="field-error">{{ field.errors|join:', ' }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+        <div class="form-actions full">
+            <a class="button button-ghost" href="{% url 'reservations:backoffice_resources' %}">Annuler</a>
+            <button class="button button-primary" type="submit">Enregistrer</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

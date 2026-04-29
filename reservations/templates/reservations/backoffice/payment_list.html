@@ -1,0 +1,56 @@
+{% extends 'reservations/backoffice/base.html' %}
+
+{% block title %}Paiements - Backoffice{% endblock %}
+
+{% block backoffice_content %}
+<div class="admin-heading">
+    <div>
+        <p class="eyebrow">Finance</p>
+        <h1>Paiements</h1>
+    </div>
+</div>
+
+<form class="filter-bar admin-filter" method="get">
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="Référence, client, fournisseur">
+    <select name="status">
+        <option value="">Tous les statuts</option>
+        {% for value, label in statuses %}
+            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button class="button button-primary" type="submit">Filtrer</button>
+</form>
+
+<section class="admin-panel">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Client</th>
+                    <th>Montant</th>
+                    <th>Méthode</th>
+                    <th>Statut</th>
+                    <th>Référence</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                    <tr>
+                        <td>{{ payment.reservation.customer_name }}</td>
+                        <td>{{ payment.amount }} {{ payment.currency }}</td>
+                        <td>{{ payment.get_method_display }}</td>
+                        <td><span class="status-pill">{{ payment.get_status_display }}</span></td>
+                        <td>{{ payment.provider_reference|default:'-' }}</td>
+                        <td>{{ payment.created_at|date:'d/m/Y H:i' }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6">Aucun paiement.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% include 'reservations/pagination.html' %}
+{% endblock %}
