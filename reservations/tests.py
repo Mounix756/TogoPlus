@@ -2,10 +2,12 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
+from .emails import send_reservation_confirmation_email
 from .fedapay import (
     FedaPayError,
     build_merchant_reference,
@@ -18,7 +20,8 @@ from .fedapay import (
     remember_payment_attempt,
     validate_transaction_matches_reservation,
 )
-from .models import Availability, Reservation, Resource
+from .invoices import build_invoice_filename, generate_invoice_pdf
+from .models import Availability, Payment, Reservation, Resource
 from .views import _build_payment_result_context
 
 
@@ -286,3 +289,57 @@ class PaymentResultContextTests(SimpleTestCase):
         self.assertEqual(context['payment_title'], 'Paiement en attente')
         self.assertEqual(context['payment_alert_class'], 'info')
         self.assertEqual(context['retry_url'], '')
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class ReservationConfirmationEmailTests(TestCase):
+    def setUp(self):
+        self.resource = Resource.objects.create(
+            name='Salle Signature',
+            slug='salle-signature',
+            capacity=100,
+            price=Decimal('25000.00'),
+            requires_payment=True,
+        )
+        self.reservation = Reservation.objects.create(
+            resource=self.resource,
+            customer_name='Ama Lawson',
+            customer_email='ama@example.com',
+            customer_phone='+22890000000',
+            start_datetime=timezone.make_aware(datetime(2026, 5, 15, 9, 0)),
+            end_datetime=timezone.make_aware(datetime(2026, 5, 15, 18, 0)),
+            attendees_count=80,
+            status=Reservation.Status.CONFIRMED,
+            total_amount=Decimal('25000.00'),
+        )
+        self.payment = Payment.objects.create(
+            reservation=self.reservation,
+            amount=Decimal('25000.00'),
+            currency='XOF',
+            method=Payment.Method.OTHER,
+            status=Payment.Status.SUCCEEDED,
+            provider='FedaPay',
+            provider_reference='TEST-PAYMENT-001',
+            metadata={
+                'fedapay_reference': 'FDP-001',
+                'fedapay_collected_amount': '100',
+            },
+        )
+
+    def test_generate_invoice_pdf_returns_pdf_document(self):
+        pdf_content = generate_invoice_pdf(self.payment)
+
+        self.assertTrue(pdf_content.startswith(b'%PDF'))
+
+    def test_send_reservation_confirmation_email_attaches_invoice_pdf(self):
+        send_reservation_confirmation_email(self.payment)
+
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertIn('Confirmation de reservation', sent_email.subject)
+        self.assertEqual(len(sent_email.attachments), 1)
+
+        attachment = sent_email.attachments[0]
+        self.assertEqual(attachment[0], build_invoice_filename(self.payment))
+        self.assertEqual(attachment[2], 'application/pdf')
+        self.assertTrue(attachment[1].startswith(b'%PDF'))

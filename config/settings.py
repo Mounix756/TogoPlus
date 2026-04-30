@@ -151,6 +151,13 @@ DEFAULT_FROM_EMAIL = os.getenv(
     'DEFAULT_FROM_EMAIL',
     'Gamedzi-Rent <no-reply@gamedzirent.local>',
 )
+INVOICE_COMPANY_NAME = os.getenv('INVOICE_COMPANY_NAME', 'Gamedzi-Rent')
+INVOICE_COMPANY_EMAIL = os.getenv('INVOICE_COMPANY_EMAIL', 'contact@gamedzirent.local')
+INVOICE_COMPANY_PHONE = os.getenv('INVOICE_COMPANY_PHONE', '+228 90 00 00 00')
+INVOICE_COMPANY_ADDRESS = os.getenv(
+    'INVOICE_COMPANY_ADDRESS',
+    'Boulevard du Mono, Lome, Togo',
+)
 EMAIL_HOST = os.getenv('EMAIL_HOST', '')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in {'1', 'true', 'yes', 'on'}

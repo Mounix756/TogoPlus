@@ -16,7 +16,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView, View
 
-from .emails import send_reservation_payment_email
+from .emails import send_reservation_confirmation_email, send_reservation_payment_email
 from .fedapay import (
     FedaPayClient,
     FedaPayError,
@@ -61,12 +61,13 @@ def _store_confirmed_reservation(token, transaction_data):
 
     reservation = load_reservation_from_token(token)
     validate_transaction_matches_reservation(transaction, reservation)
+    created_payment = None
 
     with db_transaction.atomic():
         reservation.status = Reservation.Status.CONFIRMED
         reservation.full_clean()
         reservation.save()
-        Payment.objects.create(
+        created_payment = Payment.objects.create(
             reservation=reservation,
             amount=reservation.total_amount,
             currency=settings.FEDAPAY_CURRENCY,
@@ -85,6 +86,7 @@ def _store_confirmed_reservation(token, transaction_data):
                 'reservation_token_hash': reservation_token_hash(token),
             },
         )
+        db_transaction.on_commit(lambda: _send_confirmation_email_safely(created_payment.pk))
 
     return reservation
 
@@ -135,6 +137,14 @@ def _build_payment_result_context(token, payment_status, payment_error=None):
         'payment_alert_class': alert_class,
         'retry_url': retry_url,
     }
+
+
+def _send_confirmation_email_safely(payment_id):
+    try:
+        payment = Payment.objects.select_related('reservation', 'reservation__resource').get(pk=payment_id)
+        send_reservation_confirmation_email(payment)
+    except Exception as exc:
+        logger.warning('Echec envoi email de confirmation reservation %s: %s', payment_id, exc)
 
 
 class FilteredPaginationMixin:
