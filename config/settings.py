@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+from decimal import Decimal
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -178,3 +179,8 @@ FEDAPAY_API_BASE_URL = os.getenv(
     if FEDAPAY_ENVIRONMENT == 'sandbox'
     else 'https://api.fedapay.com/v1',
 )
+FEDAPAY_TEST_CHARGE_AMOUNT = Decimal(os.getenv('FEDAPAY_TEST_CHARGE_AMOUNT', '100'))
+FEDAPAY_TRANSACTION_CACHE_TIMEOUT = int(
+    os.getenv('FEDAPAY_TRANSACTION_CACHE_TIMEOUT', RESERVATION_PAYMENT_TOKEN_MAX_AGE)
+)
+FEDAPAY_WEBHOOK_SECRET = os.getenv('FEDAPAY_WEBHOOK_SECRET', '')

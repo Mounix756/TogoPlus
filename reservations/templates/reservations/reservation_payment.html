@@ -61,8 +61,12 @@
                   {{ reservation.billable_days }} jour{{ reservation.billable_days|pluralize }}
                 </div>
                 <div class="col-md-6 mb-3">
-                  <strong>Montant</strong><br>
+                  <strong>Montant de la réservation</strong><br>
                   {{ reservation.total_amount }} XOF
+                </div>
+                <div class="col-md-6 mb-3">
+                  <strong>Montant prélevé pour le test</strong><br>
+                  {{ checkout_amount }} XOF
                 </div>
               </div>
 
@@ -78,6 +82,11 @@
               <p class="mt-4 mb-0 text-muted">
                 Le créneau sera revérifié avant la redirection vers la page de paiement, puis une dernière fois après paiement.
               </p>
+              {% if uses_test_checkout_amount %}
+                <p class="mt-2 mb-0 text-muted">
+                  Le prélèvement FedaPay est actuellement limité à un montant de test. La réservation conserve son prix réel dans notre base.
+                </p>
+              {% endif %}
             </div>
           </div>
         {% endif %}

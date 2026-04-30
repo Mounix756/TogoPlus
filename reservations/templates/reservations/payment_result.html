@@ -1,7 +1,7 @@
 {% extends 'reservations/base.html' %}
 {% load static %}
 
-{% block title %}Paiement non confirmé - GamedziRent{% endblock %}
+{% block title %}{{ payment_title|default:'Paiement non confirmé' }} - GamedziRent{% endblock %}
 
 {% block content %}
 <section class="site-hero site-hero-innerpage overlay" data-stellar-background-ratio="0.5" style="background-image: url('{% static "reservations/images/big_image_1.jpg" %}');">
@@ -9,8 +9,8 @@
     <div class="row align-items-center site-hero-inner justify-content-center">
       <div class="col-md-10 text-center">
         <div class="mb-5 element-animate">
-          <h1>Paiement non confirmé</h1>
-          <p>La réservation n’a pas été enregistrée.</p>
+          <h1>{{ payment_title|default:'Paiement non confirmé' }}</h1>
+          <p>{{ payment_intro|default:'La réservation n’a pas été enregistrée.' }}</p>
         </div>
       </div>
     </div>
@@ -21,7 +21,7 @@
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-8 text-center">
-        <div class="alert alert-warning text-left">
+        <div class="alert alert-{{ payment_alert_class|default:'warning' }} text-left">
           {% if payment_error %}
             {{ payment_error }}
           {% else %}
@@ -31,7 +31,12 @@
         {% if payment_status %}
           <p>Statut du paiement : <strong>{{ payment_status }}</strong></p>
         {% endif %}
-        <p class="mt-5">
+        <p class="mt-5 mb-3">
+          {% if retry_url %}
+            <a href="{{ retry_url }}" class="btn btn-primary">Réessayer le paiement</a>
+          {% endif %}
+        </p>
+        <p>
           <a href="{% url 'reservations:resource_list' %}" class="btn btn-primary">Revenir au catalogue</a>
         </p>
       </div>

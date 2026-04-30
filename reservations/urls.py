@@ -12,6 +12,7 @@ urlpatterns = [
     path('reservations/demande-envoyee/', views.ReservationEmailSentView.as_view(), name='reservation_email_sent'),
     path('reservations/paiement/<str:token>/', views.ReservationPaymentView.as_view(), name='reservation_payment'),
     path('reservations/paiement/<str:token>/retour/', views.FedaPayCallbackView.as_view(), name='fedapay_callback'),
+    path('reservations/paiement/webhook/fedapay/', views.FedaPayWebhookView.as_view(), name='fedapay_webhook'),
     path('reservations/<int:pk>/merci/', views.ReservationSuccessView.as_view(), name='reservation_success'),
     path('backoffice/', views.BackofficeDashboardView.as_view(), name='backoffice_dashboard'),
     path('backoffice/ressources/', views.BackofficeResourceListView.as_view(), name='backoffice_resources'),

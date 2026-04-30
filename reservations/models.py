@@ -286,7 +286,10 @@ class Reservation(TimeStampedModel):
                 overlap_query = overlap_query.exclude(pk=self.pk)
 
             if overlap_query.exists():
-                errors['start_datetime'] = 'Cette ressource est déjà réservée sur ce créneau.'
+                errors['start_datetime'] = (
+                    'Cette ressource est déjà occupée sur la période sélectionnée. '
+                    'Nous ne pouvons pas la fournir sur ce créneau.'
+                )
 
         if errors:
             raise ValidationError(errors)

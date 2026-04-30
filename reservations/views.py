@@ -1,21 +1,37 @@
+import logging
+
+from fedapay import Webhook as FedaPayWebhook
+from fedapay._error import SignatureVerificationError
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
 from django.db.models import Count, Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView, View
 
 from .emails import send_reservation_payment_email
 from .fedapay import (
     FedaPayClient,
     FedaPayError,
+    build_merchant_reference,
+    extract_checkout_amount,
     extract_transaction,
     extract_payment_url,
+    extract_reservation_token,
     extract_transaction_id,
     extract_transaction_status,
+    forget_payment_attempt,
+    get_checkout_amount,
+    get_payment_attempt,
+    remember_payment_attempt,
+    reservation_token_hash,
     validate_transaction_matches_reservation,
 )
 from .forms import ReservationBackofficeForm, ReservationForm, ResourceForm
@@ -25,6 +41,100 @@ from .tokens import (
     build_reservation_payment_token,
     load_reservation_from_token,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+def _store_confirmed_reservation(token, transaction_data):
+    transaction = extract_transaction(transaction_data)
+    transaction_id = transaction.get('id')
+    if not transaction_id:
+        raise FedaPayError('La transaction FedaPay est invalide.')
+
+    existing_payment = Payment.objects.filter(
+        provider='FedaPay',
+        provider_reference=str(transaction_id),
+    ).select_related('reservation').first()
+    if existing_payment:
+        return existing_payment.reservation
+
+    reservation = load_reservation_from_token(token)
+    validate_transaction_matches_reservation(transaction, reservation)
+
+    with db_transaction.atomic():
+        reservation.status = Reservation.Status.CONFIRMED
+        reservation.full_clean()
+        reservation.save()
+        Payment.objects.create(
+            reservation=reservation,
+            amount=reservation.total_amount,
+            currency=settings.FEDAPAY_CURRENCY,
+            method=Payment.Method.OTHER,
+            status=Payment.Status.SUCCEEDED,
+            provider='FedaPay',
+            provider_reference=str(transaction_id),
+            paid_at=timezone.now(),
+            metadata={
+                'fedapay_status': transaction.get('status', ''),
+                'fedapay_transaction_id': str(transaction_id),
+                'fedapay_reference': transaction.get('reference', ''),
+                'fedapay_receipt_url': transaction.get('receipt_url', ''),
+                'fedapay_collected_amount': str(extract_checkout_amount(transaction)),
+                'reservation_total_amount': str(reservation.total_amount),
+                'reservation_token_hash': reservation_token_hash(token),
+            },
+        )
+
+    return reservation
+
+
+def _build_payment_result_context(token, payment_status, payment_error=None):
+    normalized_status = (payment_status or 'unknown').lower()
+    title = 'Paiement non confirmé'
+    intro = 'La réservation n’a pas été enregistrée.'
+    alert_class = 'warning'
+    message = payment_error or 'Le paiement n’a pas été approuvé.'
+    retry_url = reverse('reservations:reservation_payment', kwargs={'token': token})
+
+    if normalized_status in {'canceled', 'cancelled'}:
+        title = 'Paiement annulé'
+        message = payment_error or (
+            'Le paiement a été annulé avant confirmation. La réservation n’a pas été enregistrée.'
+        )
+    elif normalized_status in {'failed', 'declined', 'rejected'}:
+        title = 'Paiement échoué'
+        alert_class = 'danger'
+        message = payment_error or (
+            'Le paiement a échoué ou a été refusé. Vous pouvez relancer une nouvelle tentative.'
+        )
+    elif normalized_status in {'expired'}:
+        title = 'Session expirée'
+        message = payment_error or (
+            'La session de paiement a expiré. Vous pouvez générer une nouvelle tentative.'
+        )
+    elif normalized_status in {'pending', 'processing'}:
+        title = 'Paiement en attente'
+        intro = 'La réservation n’est pas encore confirmée.'
+        alert_class = 'info'
+        message = payment_error or (
+            'Le paiement est encore en cours de traitement. Revenez dans quelques instants.'
+        )
+        retry_url = ''
+    elif normalized_status in {'unknown'}:
+        title = 'Retour de paiement incomplet'
+        message = payment_error or (
+            'Le retour de paiement est incomplet. Vous pouvez réessayer ou contacter le support.'
+        )
+
+    return {
+        'payment_title': title,
+        'payment_intro': intro,
+        'payment_status': normalized_status,
+        'payment_error': message,
+        'payment_alert_class': alert_class,
+        'retry_url': retry_url,
+    }
 
 
 class FilteredPaginationMixin:
@@ -169,7 +279,10 @@ class ReservationPaymentView(TemplateView):
         token = self.kwargs['token']
         context['token'] = token
         try:
-            context['reservation'] = load_reservation_from_token(token)
+            reservation = load_reservation_from_token(token)
+            context['reservation'] = reservation
+            context['checkout_amount'] = get_checkout_amount(reservation.total_amount)
+            context['uses_test_checkout_amount'] = context['checkout_amount'] != reservation.total_amount
         except (ReservationTokenError, Resource.DoesNotExist, ValidationError) as exc:
             context['token_error'] = exc
         return context
@@ -194,8 +307,26 @@ class ReservationPaymentView(TemplateView):
 
         try:
             client = FedaPayClient()
-            transaction_data = client.create_transaction(reservation, callback_url)
+            merchant_reference = build_merchant_reference(token)
+            transaction_data = client.retrieve_transaction_by_merchant_reference(merchant_reference)
+            if not transaction_data:
+                transaction_data = client.create_transaction(
+                    reservation,
+                    callback_url,
+                    reservation_token=token,
+                    merchant_reference=merchant_reference,
+                )
             transaction_id = extract_transaction_id(transaction_data)
+            status = extract_transaction_status(transaction_data)
+            remember_payment_attempt(token, transaction_data, merchant_reference=merchant_reference)
+
+            if status == 'approved':
+                callback_redirect_url = (
+                    reverse('reservations:fedapay_callback', kwargs={'token': token})
+                    + f'?id={transaction_id}&status=approved'
+                )
+                return redirect(callback_redirect_url)
+
             payment_link_data = client.create_payment_link(transaction_id)
             return redirect(extract_payment_url(payment_link_data))
         except FedaPayError as exc:
@@ -210,79 +341,127 @@ class FedaPayCallbackView(TemplateView):
     def get(self, request, *args, **kwargs):
         token = kwargs['token']
         transaction_id = request.GET.get('id')
+        callback_status = (request.GET.get('status') or '').lower()
+        transaction_data = None
+        payment_attempt = get_payment_attempt(token)
 
         if not transaction_id:
-            return self.render_to_response({
-                'payment_status': 'unknown',
-                'payment_error': 'Le paiement n’a pas retourné d’identifiant vérifiable.',
-            })
+            transaction_id = payment_attempt.get('transaction_id')
 
         try:
             client = FedaPayClient()
-            transaction_data = client.retrieve_transaction(transaction_id)
+            if transaction_id:
+                transaction_data = client.retrieve_transaction(transaction_id)
+            else:
+                merchant_reference = payment_attempt.get('merchant_reference') or build_merchant_reference(token)
+                transaction_data = client.retrieve_transaction_by_merchant_reference(merchant_reference)
+                if transaction_data:
+                    transaction_id = extract_transaction_id(transaction_data)
         except FedaPayError as exc:
-            return self.render_to_response({
-                'payment_status': 'unknown',
-                'payment_error': exc,
-            })
+            return self.render_to_response(
+                _build_payment_result_context(
+                    token,
+                    callback_status or 'unknown',
+                    str(exc),
+                )
+            )
+
+        if not transaction_id or not transaction_data:
+            return self.render_to_response(
+                _build_payment_result_context(
+                    token,
+                    callback_status or 'unknown',
+                    (
+                        'Le retour de paiement ne contient pas d’identifiant exploitable et '
+                        'aucune transaction correspondante n’a été retrouvée.'
+                    ),
+                )
+            )
 
         status = extract_transaction_status(transaction_data)
         if status != 'approved':
-            return self.render_to_response({
-                'payment_status': status,
-                'payment_error': 'Le paiement n’est pas approuvé. La réservation n’a pas été enregistrée.',
-            })
-
-        existing_payment = Payment.objects.filter(
-            provider='FedaPay',
-            provider_reference=str(transaction_id),
-        ).select_related('reservation').first()
-        if existing_payment:
-            return redirect('reservations:reservation_success', pk=existing_payment.reservation_id)
-
-        try:
-            reservation = load_reservation_from_token(token)
-        except (ReservationTokenError, Resource.DoesNotExist, ValidationError) as exc:
-            return self.render_to_response({
-                'payment_status': status,
-                'payment_error': exc,
-            })
-
-        try:
-            transaction = extract_transaction(transaction_data)
-            validate_transaction_matches_reservation(transaction, reservation)
-
-            with db_transaction.atomic():
-                reservation.status = Reservation.Status.CONFIRMED
-                reservation.full_clean()
-                reservation.save()
-                Payment.objects.create(
-                    reservation=reservation,
-                    amount=reservation.total_amount,
-                    currency='XOF',
-                    method=Payment.Method.OTHER,
-                    status=Payment.Status.SUCCEEDED,
-                    provider='FedaPay',
-                    provider_reference=str(transaction_id),
-                    paid_at=timezone.now(),
-                    metadata={
-                        'fedapay_status': status,
-                        'fedapay_transaction_id': str(transaction_id),
-                    },
+            return self.render_to_response(
+                _build_payment_result_context(
+                    token,
+                    status,
+                    'Le paiement n’est pas approuvé. La réservation n’a pas été enregistrée.',
                 )
-        except (FedaPayError, ValidationError) as exc:
-            return self.render_to_response({
-                'payment_status': status,
-                'payment_error': exc,
-            })
+            )
 
+        try:
+            reservation = _store_confirmed_reservation(token, transaction_data)
+        except (FedaPayError, ReservationTokenError, Resource.DoesNotExist, ValidationError) as exc:
+            return self.render_to_response(
+                _build_payment_result_context(
+                    token,
+                    status,
+                    str(exc),
+                )
+            )
+
+        forget_payment_attempt(token)
         return redirect('reservations:reservation_success', pk=reservation.pk)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class FedaPayWebhookView(View):
+    def post(self, request, *args, **kwargs):
+        if not settings.FEDAPAY_WEBHOOK_SECRET:
+            return HttpResponse('Webhook FedaPay non configure.', status=503)
+
+        signature = request.headers.get('X-FEDAPAY-SIGNATURE', '')
+        if not signature:
+            return HttpResponse('Signature webhook manquante.', status=400)
+
+        try:
+            event = FedaPayWebhook.construct_event(
+                request.body,
+                signature,
+                settings.FEDAPAY_WEBHOOK_SECRET,
+            )
+        except (ValueError, SignatureVerificationError):
+            return HttpResponse('Signature webhook invalide.', status=400)
+
+        event_name = event.get('name') or event.get('type') or ''
+        transaction = extract_transaction(event)
+        if not transaction:
+            logger.warning('Webhook FedaPay sans transaction exploitable: %s', event)
+            return HttpResponse(status=200)
+
+        token = extract_reservation_token(transaction)
+        if not token:
+            logger.warning('Webhook FedaPay sans reservation_token exploitable: %s', transaction)
+            return HttpResponse(status=200)
+
+        status = transaction.get('status') or ''
+        if event_name != 'transaction.approved' and status != 'approved':
+            return HttpResponse(status=200)
+
+        try:
+            _store_confirmed_reservation(token, transaction)
+        except (FedaPayError, ReservationTokenError, Resource.DoesNotExist, ValidationError) as exc:
+            logger.warning('Echec traitement webhook FedaPay: %s', exc)
+            return HttpResponse(status=200)
+
+        forget_payment_attempt(token)
+        return HttpResponse(status=200)
 
 
 class ReservationSuccessView(DetailView):
     model = Reservation
     template_name = 'reservations/reservation_success.html'
     context_object_name = 'reservation'
+
+    def get_queryset(self):
+        return Reservation.objects.select_related('resource').prefetch_related('payments')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        payment = self.object.payments.first()
+        context['latest_payment'] = payment
+        if payment and payment.metadata:
+            context['fedapay_collected_amount'] = payment.metadata.get('fedapay_collected_amount')
+        return context
 
 
 class StaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
