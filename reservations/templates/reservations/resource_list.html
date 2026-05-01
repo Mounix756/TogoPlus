@@ -83,7 +83,9 @@
         <div class="col-md-4 mb-4">
           <div class="media d-block room mb-0">
             <figure>
-              {% if forloop.counter|divisibleby:"3" %}
+              {% if resource.primary_image %}
+                <img src="{{ resource.primary_image.image.url }}" alt="{{ resource.name }}" class="img-fluid">
+              {% elif forloop.counter|divisibleby:"3" %}
                 <img src="{% static 'reservations/images/img_1.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
               {% elif forloop.counter|divisibleby:"2" %}
                 <img src="{% static 'reservations/images/img_3.jpg' %}" alt="{{ resource.name }}" class="img-fluid">

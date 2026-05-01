@@ -1,34 +1,236 @@
 {% extends 'reservations/backoffice/base.html' %}
 
-{% block title %}Ressource - Backoffice{% endblock %}
+{% block title %}Ressource - Backoffice GamedziRent{% endblock %}
 
 {% block backoffice_content %}
-<div class="admin-heading">
-    <div>
-        <p class="eyebrow">Ressource</p>
-        <h1>{% if object %}Modifier {{ object.name }}{% else %}Nouvelle ressource{% endif %}</h1>
+
+<div class="row justify-content-center">
+  <div class="col-lg-12">
+
+    <div class="white_card card_height_100 mb_30">
+
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">
+              {% if object %}
+                Modifier {{ object.name }}
+              {% else %}
+                Nouvelle ressource
+              {% endif %}
+            </h3>
+          </div>
+
+	          <div class="header_more_tool d-flex flex-wrap" style="gap: 10px;">
+	            {% if object %}
+	              <a href="{% url 'reservations:backoffice_resource_delete' object.pk %}" class="btn btn-danger">
+	                Supprimer
+	              </a>
+	            {% endif %}
+
+	            <a href="{% url 'reservations:backoffice_resources' %}" class="btn_2">
+	              Retour
+	            </a>
+	          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="row">
+
+            {% for field in form %}
+
+              {% if field.name == 'description' %}
+                <div class="col-lg-12">
+              {% elif field.name == 'requires_payment' %}
+                <div class="col-lg-6">
+              {% else %}
+                <div class="col-lg-6">
+              {% endif %}
+
+                <div class="form-group">
+                  <label for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                  </label>
+
+                  {% if field.name == 'requires_payment' or field.name == 'is_active' %}
+                    <div class="form-check">
+                      {{ field }}
+                    </div>
+                  {% else %}
+                    {{ field }}
+                  {% endif %}
+
+                  {% if field.help_text %}
+                    <small class="form-text text-muted">
+                      {{ field.help_text }}
+                    </small>
+                  {% endif %}
+
+                  {% if field.errors %}
+                    <div class="text-danger mt-2">
+                      {{ field.errors|join:', ' }}
+                    </div>
+                  {% endif %}
+                </div>
+
+              </div>
+
+            {% endfor %}
+
+          </div>
+
+          <hr class="my-4">
+
+	          <div class="d-flex justify-content-between align-items-center flex-wrap mb_20" style="gap: 10px;">
+	            <div>
+	              <h4 class="mb-1">Images de la ressource</h4>
+	              <p class="mb-0 text-muted">Sélectionnez jusqu’à {{ max_resource_images }} images. La première image sera utilisée dans la vitrine.</p>
+	            </div>
+	          </div>
+
+	          {% if image_upload_form.non_field_errors %}
+	            <div class="alert alert-danger">
+	              {{ image_upload_form.non_field_errors }}
+	            </div>
+	          {% endif %}
+
+	          {% if existing_images %}
+	            <div class="row mb_20">
+	              {% for image in existing_images %}
+	                <div class="col-md-3 col-sm-6 mb_20">
+	                  <div class="card h-100">
+	                    <img
+	                      src="{{ image.image.url }}"
+	                      alt="Image {{ forloop.counter }} de {{ object.name|default:'la ressource' }}"
+	                      class="card-img-top"
+	                      style="height: 160px; object-fit: cover;"
+	                    >
+	                    <div class="card-body">
+	                      <div class="form-check">
+	                        {% with image_pk=image.pk|stringformat:"s" %}
+	                          <input
+	                            type="checkbox"
+	                            name="delete_images"
+	                            value="{{ image.pk }}"
+	                            id="delete-resource-image-{{ image.pk }}"
+	                            class="form-check-input"
+	                            {% if image_pk in selected_delete_image_ids %}checked{% endif %}
+	                          >
+	                        {% endwith %}
+	                        <label class="form-check-label" for="delete-resource-image-{{ image.pk }}">
+	                          Supprimer
+	                        </label>
+	                      </div>
+	                    </div>
+	                  </div>
+	                </div>
+	              {% endfor %}
+	            </div>
+	          {% endif %}
+
+	          <div class="form-group">
+	            <label for="{{ image_upload_form.images.id_for_label }}">Ajouter des images</label>
+	            {{ image_upload_form.images }}
+	            <small class="form-text text-muted">
+	              Vous pouvez sélectionner plusieurs images en une seule fois.
+	            </small>
+	            {% if image_upload_form.images.errors %}
+	              <div class="text-danger mt-2">
+	                {{ image_upload_form.images.errors|join:', ' }}
+	              </div>
+	            {% endif %}
+	          </div>
+
+	          <div id="selected-images-summary" class="text-muted mb_20">
+	            Aucune nouvelle image sélectionnée.
+	          </div>
+
+	          <div id="selected-images-preview" class="row mb_20"></div>
+
+          <div class="row mt_30">
+            <div class="col-lg-12">
+              <div class="d-flex justify-content-end flex-wrap" style="gap: 10px;">
+                <a href="{% url 'reservations:backoffice_resources' %}" class="btn_2">
+                  Annuler
+                </a>
+
+                <button type="submit" class="btn_1">
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+
+	        </form>
+
+	      </div>
+
     </div>
+
+  </div>
 </div>
 
-<section class="admin-panel">
-    <form method="post" class="form-grid">
-        {% csrf_token %}
-        {% for field in form %}
-            <div class="form-field {% if field.name == 'description' %}full{% endif %}">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                    <small>{{ field.help_text }}</small>
-                {% endif %}
-                {% if field.errors %}
-                    <p class="field-error">{{ field.errors|join:', ' }}</p>
-                {% endif %}
-            </div>
-        {% endfor %}
-        <div class="form-actions full">
-            <a class="button button-ghost" href="{% url 'reservations:backoffice_resources' %}">Annuler</a>
-            <button class="button button-primary" type="submit">Enregistrer</button>
-        </div>
-    </form>
-</section>
+<script>
+  (function () {
+    var input = document.getElementById('resource-images-input');
+    var preview = document.getElementById('selected-images-preview');
+    var summary = document.getElementById('selected-images-summary');
+    var maxImages = {{ max_resource_images|default:4 }};
+
+    if (!input || !preview || !summary) {
+      return;
+    }
+
+    input.addEventListener('change', function () {
+      preview.innerHTML = '';
+
+      var files = Array.prototype.slice.call(input.files || []);
+      if (!files.length) {
+        summary.textContent = 'Aucune nouvelle image sélectionnée.';
+        return;
+      }
+
+      summary.textContent = files.length + ' image(s) sélectionnée(s).';
+      if (files.length > maxImages) {
+        summary.textContent += ' Seules ' + maxImages + ' images maximum seront acceptées.';
+      }
+
+      files.forEach(function (file, index) {
+        if (!file.type || file.type.indexOf('image/') !== 0) {
+          return;
+        }
+
+        var imageUrl = URL.createObjectURL(file);
+        var column = document.createElement('div');
+        column.className = 'col-md-3 col-sm-6 mb_20';
+
+        var image = document.createElement('img');
+        image.src = imageUrl;
+        image.alt = 'Image sélectionnée ' + (index + 1);
+        image.className = 'img-fluid rounded';
+        image.style.width = '100%';
+        image.style.height = '160px';
+        image.style.objectFit = 'cover';
+        image.onload = function () {
+          URL.revokeObjectURL(imageUrl);
+        };
+
+        column.appendChild(image);
+        preview.appendChild(column);
+      });
+    });
+  }());
+</script>
+
 {% endblock %}

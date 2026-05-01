@@ -4,7 +4,11 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.http import QueryDict
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
+from django.utils.datastructures import MultiValueDict
 from django.utils import timezone
 
 from .emails import send_reservation_confirmation_email
@@ -20,8 +24,9 @@ from .fedapay import (
     remember_payment_attempt,
     validate_transaction_matches_reservation,
 )
+from .forms import ResourceForm, ResourceImagesUploadForm
 from .invoices import build_invoice_filename, generate_invoice_pdf
-from .models import Availability, Payment, Reservation, Resource
+from .models import Availability, Payment, Reservation, Resource, ResourceImage
 from .views import _build_payment_result_context
 
 
@@ -289,6 +294,225 @@ class PaymentResultContextTests(SimpleTestCase):
         self.assertEqual(context['payment_title'], 'Paiement en attente')
         self.assertEqual(context['payment_alert_class'], 'info')
         self.assertEqual(context['retry_url'], '')
+
+
+@override_settings(MEDIA_ROOT='/tmp/e-reservation-test-media')
+class ResourceBackofficeBehaviorTests(TestCase):
+    tiny_gif = (
+        b'GIF87a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00'
+        b'\xff\xff\xff,\x00\x00\x00\x00\x01\x00\x01\x00'
+        b'\x00\x02\x02D\x01\x00;'
+    )
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='manager',
+            email='manager@example.com',
+            password='pass-test-123',
+            is_staff=True,
+        )
+
+    def test_resource_form_assigns_connected_user_as_manager(self):
+        form = ResourceForm(
+            data={
+                'name': 'Salle Togo+ Prestige',
+                'category': '',
+                'resource_type': Resource.ResourceType.ROOM,
+                'description': 'Grande salle',
+                'location': 'Lome',
+                'capacity': 50,
+                'price': '25000',
+                'requires_payment': 'on',
+            },
+            user=self.user,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        resource = form.save()
+
+        self.assertEqual(resource.manager, self.user)
+        self.assertTrue(resource.is_active)
+        self.assertEqual(resource.slug, 'salle-togo-prestige')
+
+    def test_resource_slug_is_made_unique_automatically(self):
+        Resource.objects.create(
+            name='Salle Premium',
+            slug='salle-premium',
+            manager=self.user,
+        )
+
+        resource = Resource.objects.create(
+            name='Salle Premium',
+            slug='sera-remplace',
+            manager=self.user,
+        )
+
+        self.assertEqual(resource.slug, 'salle-premium-2')
+
+    def test_resource_create_view_uses_single_multiple_image_input(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('reservations:backoffice_resource_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="resource-images-input"')
+        self.assertContains(response, 'multiple')
+        self.assertNotContains(response, 'Image 1')
+
+    def test_resource_list_displays_delete_action(self):
+        resource = Resource.objects.create(
+            name='Salle à supprimer',
+            slug='salle-a-supprimer',
+            manager=self.user,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('reservations:backoffice_resources'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse('reservations:backoffice_resource_delete', kwargs={'pk': resource.pk}),
+        )
+
+    def test_resource_delete_view_deletes_resource_and_images(self):
+        resource = Resource.objects.create(
+            name='Studio à supprimer',
+            slug='studio-a-supprimer',
+            manager=self.user,
+        )
+        resource_image = ResourceImage.objects.create(
+            resource=resource,
+            image=self._image_upload('delete-me.gif'),
+        )
+        image_storage = resource_image.image.storage
+        image_name = resource_image.image.name
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('reservations:backoffice_resource_delete', kwargs={'pk': resource.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Confirmer la suppression')
+        self.assertTrue(image_storage.exists(image_name))
+
+        response = self.client.post(
+            reverse('reservations:backoffice_resource_delete', kwargs={'pk': resource.pk})
+        )
+
+        self.assertRedirects(response, reverse('reservations:backoffice_resources'))
+        self.assertFalse(Resource.objects.filter(pk=resource.pk).exists())
+        self.assertFalse(ResourceImage.objects.filter(pk=resource_image.pk).exists())
+        self.assertFalse(image_storage.exists(image_name))
+
+    def test_resource_delete_view_keeps_resource_with_reservations(self):
+        resource = Resource.objects.create(
+            name='Salle protégée',
+            slug='salle-protegee',
+            manager=self.user,
+        )
+        Reservation.objects.create(
+            resource=resource,
+            customer_name='Client Historique',
+            customer_email='historique@example.com',
+            start_datetime=timezone.make_aware(datetime(2026, 6, 1, 9, 0)),
+            end_datetime=timezone.make_aware(datetime(2026, 6, 1, 12, 0)),
+            status=Reservation.Status.CONFIRMED,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('reservations:backoffice_resource_delete', kwargs={'pk': resource.pk})
+        )
+
+        self.assertRedirects(response, reverse('reservations:backoffice_resources'))
+        self.assertTrue(Resource.objects.filter(pk=resource.pk).exists())
+
+    def test_resource_image_limit_is_enforced(self):
+        resource = Resource.objects.create(
+            name='Studio Photo',
+            slug='studio-photo',
+            manager=self.user,
+        )
+        for index in range(4):
+            ResourceImage.objects.create(
+                resource=resource,
+                image=SimpleUploadedFile(
+                    f'image-{index}.jpg',
+                    b'filecontent',
+                    content_type='image/jpeg',
+                ),
+                sort_order=index + 1,
+            )
+
+        extra_image = ResourceImage(
+            resource=resource,
+            image=SimpleUploadedFile(
+                'image-5.jpg',
+                b'filecontent',
+                content_type='image/jpeg',
+            ),
+        )
+
+        with self.assertRaises(ValidationError):
+            extra_image.full_clean()
+
+    def test_resource_images_upload_form_accepts_multiple_images_from_single_field(self):
+        form = ResourceImagesUploadForm(
+            data={},
+            files=MultiValueDict(
+                {
+                    'images': [
+                        self._image_upload('image-1.gif'),
+                        self._image_upload('image-2.gif'),
+                    ]
+                }
+            ),
+            current_image_ids=[],
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(len(form.cleaned_data['images']), 2)
+
+    def test_resource_images_upload_form_keeps_four_images_max_after_deletions(self):
+        data = QueryDict('', mutable=True)
+        data.setlist('delete_images', ['2'])
+        form = ResourceImagesUploadForm(
+            data=data,
+            files=MultiValueDict(
+                {
+                    'images': [
+                        self._image_upload('new-1.gif'),
+                        self._image_upload('new-2.gif'),
+                    ]
+                }
+            ),
+            current_image_ids=[1, 2, 3],
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_delete_image_ids, {2})
+
+    def test_resource_images_upload_form_rejects_more_than_four_images(self):
+        form = ResourceImagesUploadForm(
+            data={},
+            files=MultiValueDict(
+                {
+                    'images': [
+                        self._image_upload('new-1.gif'),
+                        self._image_upload('new-2.gif'),
+                    ]
+                }
+            ),
+            current_image_ids=[1, 2, 3],
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('Une ressource ne peut pas contenir plus de 4 images.', form.non_field_errors())
+
+    def _image_upload(self, name):
+        return SimpleUploadedFile(name, self.tiny_gif, content_type='image/gif')
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')

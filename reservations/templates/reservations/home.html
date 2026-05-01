@@ -57,64 +57,72 @@
     </div>
 
     <div class="row">
-      <div class="col-md-7">
-        <div class="media d-block room mb-0">
-          <figure>
-            <img src="{% static 'reservations/images/img_1.jpg' %}" alt="Salle principale GamedziRent" class="img-fluid">
-            <div class="overlap-text">
-              <span>
-                Espaces disponibles
-                <span class="ion-ios-star"></span>
-                <span class="ion-ios-star"></span>
-                <span class="ion-ios-star"></span>
-              </span>
-            </div>
-          </figure>
+      {% for resource in featured_resources %}
+        <div class="col-md-4 mb-4">
+          <div class="media d-block room mb-0">
+            <figure>
+              {% if resource.primary_image %}
+                <img src="{{ resource.primary_image.image.url }}" alt="{{ resource.name }}" class="img-fluid">
+              {% elif forloop.counter|divisibleby:"3" %}
+                <img src="{% static 'reservations/images/img_1.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+              {% elif forloop.counter|divisibleby:"2" %}
+                <img src="{% static 'reservations/images/img_3.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+              {% else %}
+                <img src="{% static 'reservations/images/img_2.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+              {% endif %}
+              <div class="overlap-text">
+                <span>
+                  {{ resource.get_resource_type_display }}
+                  <span class="ion-ios-star"></span>
+                  <span class="ion-ios-star"></span>
+                  <span class="ion-ios-star"></span>
+                </span>
+              </div>
+            </figure>
 
-          <div class="media-body">
-            <h3 class="mt-0"><a href="{% url 'reservations:resource_list' %}">Salles et espaces événementiels</a></h3>
-            <ul class="room-specs">
-              <li><span class="ion-ios-people-outline"></span> Pour particuliers et organisations</li>
-              <li><span class="ion-ios-crop"></span> Plusieurs formats disponibles</li>
-            </ul>
-            <p>
-              Trouvez un espace adapté à vos réunions, formations, événements professionnels,
-              cérémonies ou activités privées.
-            </p>
-            <p><a href="{% url 'reservations:resource_list' %}" class="btn btn-primary btn-sm">Consulter les offres</a></p>
+            <div class="media-body">
+              <h3 class="mt-0">
+                <a href="{% url 'reservations:resource_detail' resource.slug %}">
+                  {{ resource.name }}
+                </a>
+              </h3>
+              <ul class="room-specs">
+                <li>
+                  <span class="ion-ios-people-outline"></span>
+                  {{ resource.capacity }} personnes
+                </li>
+                <li>
+                  <span class="ion-ios-pricetag-outline"></span>
+                  {{ resource.price }} XOF / jour
+                </li>
+              </ul>
+              <p>
+                {{ resource.description|default:'Ressource disponible à la réservation sur GamedziRent.'|truncatewords:20 }}
+              </p>
+              <p>
+                <a href="{% url 'reservations:resource_detail' resource.slug %}" class="btn btn-primary btn-sm">
+                  Voir les détails
+                </a>
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="col-md-5 room-thumbnail-absolute">
-        <a href="{% url 'reservations:resource_list' %}" class="media d-block room bg first-room" style="background-image: url('{% static "reservations/images/img_2.jpg" %}');">
-          <div class="overlap-text">
-            <span>
-              Services
-              <span class="ion-ios-star"></span>
-              <span class="ion-ios-star"></span>
-              <span class="ion-ios-star"></span>
-            </span>
-            <span class="pricing-from">
-              sur demande
-            </span>
+      {% empty %}
+        <div class="col-md-12">
+          <div class="heading-wrap text-center element-animate">
+            <h4 class="sub-heading">Catalogue en préparation</h4>
+            <h2 class="heading">Ajoutez vos premières ressources</h2>
+            <p class="mb-4">
+              Une fois les ressources créées dans le backoffice, leurs images remonteront automatiquement ici.
+            </p>
+            <p>
+              <a href="{% url 'reservations:resource_list' %}" class="btn btn-primary btn-sm">
+                Voir le catalogue
+              </a>
+            </p>
           </div>
-        </a>
-
-        <a href="{% url 'reservations:resource_list' %}" class="media d-block room bg second-room" style="background-image: url('{% static "reservations/images/img_4.jpg" %}');">
-          <div class="overlap-text">
-            <span>
-              Équipements
-              <span class="ion-ios-star"></span>
-              <span class="ion-ios-star"></span>
-              <span class="ion-ios-star"></span>
-            </span>
-            <span class="pricing-from">
-              disponibles
-            </span>
-          </div>
-        </a>
-      </div>
+        </div>
+      {% endfor %}
     </div>
   </div>
 </section>

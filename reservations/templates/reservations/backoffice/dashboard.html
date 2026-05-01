@@ -1,73 +1,342 @@
 {% extends 'reservations/backoffice/base.html' %}
 
-{% block title %}Backoffice - Togo+{% endblock %}
+{% block title %}Backoffice - GamedziRent{% endblock %}
 
 {% block backoffice_content %}
-<div class="admin-heading">
-    <div>
-        <p class="eyebrow">Pilotage</p>
-        <h1>Tableau de bord</h1>
+
+<div class="row">
+  <div class="col-lg-12">
+    <div class="white_card mb_30">
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Tableau de bord</h3>
+          </div>
+
+          <div class="header_more_tool">
+            <a href="{% url 'reservations:backoffice_resource_create' %}" class="btn_1">
+              Nouvelle ressource
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {% comment %} <div class="white_card_body">
+        <p class="mb-0">
+          Suivez les ressources, les réservations, les paiements et l’activité de GamedziRent depuis un seul espace.
+        </p>
+      </div> {% endcomment %}
     </div>
-    <a class="button button-primary" href="{% url 'reservations:backoffice_resource_create' %}">Nouvelle ressource</a>
+  </div>
 </div>
 
-<div class="stat-grid">
-    <article>
-        <span>Ressources</span>
-        <strong>{{ active_resources }}/{{ total_resources }}</strong>
-    </article>
-    <article>
-        <span>En attente</span>
-        <strong>{{ pending_reservations }}</strong>
-    </article>
-    <article>
-        <span>Confirmées</span>
-        <strong>{{ confirmed_reservations }}</strong>
-    </article>
-    <article>
-        <span>Revenus encaissés</span>
-        <strong>{{ revenue }} XOF</strong>
-    </article>
-</div>
+<div class="row">
+  <div class="col-12">
+    <div class="quick_activity">
+      <div class="row">
+        <div class="col-12">
+          <div class="quick_activity_wrap">
 
-<div class="admin-columns">
-    <section class="admin-panel">
-        <h2>Prochaines réservations</h2>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Client</th>
-                        <th>Ressource</th>
-                        <th>Date</th>
-                        <th>Statut</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for reservation in upcoming_reservations %}
-                        <tr>
-                            <td>{{ reservation.customer_name }}</td>
-                            <td>{{ reservation.resource.name }}</td>
-                            <td>{{ reservation.start_datetime|date:'d/m/Y H:i' }}</td>
-                            <td><span class="status-pill">{{ reservation.get_status_display }}</span></td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="4">Aucune réservation à venir.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="single_quick_activity">
+              <div class="count_content">
+                <p>Ressources actives</p>
+                <h3>
+                  <span class="counter">{{ active_resources }}</span>/<span>{{ total_resources }}</span>
+                </h3>
+              </div>
+              <a href="{% url 'reservations:backoffice_resources' %}" class="notification_btn">
+                Gérer
+              </a>
+              <div id="bar1" class="barfiller">
+                <div class="tipWrap">
+                  <span class="tip"></span>
+                </div>
+                <span class="fill" data-percentage="95"></span>
+              </div>
+            </div>
+
+            <div class="single_quick_activity">
+              <div class="count_content">
+                <p>Réservations en attente</p>
+                <h3>
+                  <span class="counter">{{ pending_reservations }}</span>
+                </h3>
+              </div>
+              <a href="{% url 'reservations:backoffice_reservations' %}?status=pending" class="notification_btn yellow_btn">
+                À traiter
+              </a>
+              <div id="bar2" class="barfiller">
+                <div class="tipWrap">
+                  <span class="tip"></span>
+                </div>
+                <span class="fill" data-percentage="65"></span>
+              </div>
+            </div>
+
+            <div class="single_quick_activity">
+              <div class="count_content">
+                <p>Réservations confirmées</p>
+                <h3>
+                  <span class="counter">{{ confirmed_reservations }}</span>
+                </h3>
+              </div>
+              <a href="{% url 'reservations:backoffice_reservations' %}?status=confirmed" class="notification_btn green_btn">
+                Confirmées
+              </a>
+              <div id="bar3" class="barfiller">
+                <div class="tipWrap">
+                  <span class="tip"></span>
+                </div>
+                <span class="fill" data-percentage="75"></span>
+              </div>
+            </div>
+
+            <div class="single_quick_activity">
+              <div class="count_content">
+                <p>Revenus encaissés</p>
+                <h3>
+                  <span class="counter">{{ revenue }}</span> XOF
+                </h3>
+              </div>
+              <a href="{% url 'reservations:backoffice_payments' %}" class="notification_btn violate_btn">
+                Paiements
+              </a>
+              <div id="bar4" class="barfiller">
+                <div class="tipWrap">
+                  <span class="tip"></span>
+                </div>
+                <span class="fill" data-percentage="85"></span>
+              </div>
+            </div>
+
+          </div>
         </div>
-    </section>
-
-    <section class="admin-panel">
-        <h2>Statuts</h2>
-        <div class="status-list">
-            {% for item in status_cards %}
-                <p><span>{{ item.label }}</span><strong>{{ item.total }}</strong></p>
-            {% empty %}
-                <p>Aucune réservation enregistrée.</p>
-            {% endfor %}
-        </div>
-    </section>
+      </div>
+    </div>
+  </div>
 </div>
+
+<div class="row">
+
+  <div class="col-lg-8">
+    <div class="white_card card_height_100 mb_30">
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Prochaines réservations</h3>
+          </div>
+
+          <div class="header_more_tool">
+            <a href="{% url 'reservations:backoffice_reservations' %}" class="btn_1">
+              Voir tout
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+        <div class="QA_table table-responsive">
+          <table class="table pt-0">
+            <thead>
+              <tr>
+                <th scope="col">Client</th>
+                <th scope="col">Ressource</th>
+                <th scope="col">Date</th>
+                <th scope="col">Statut</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for reservation in upcoming_reservations %}
+                <tr>
+                  <td>{{ reservation.customer_name }}</td>
+                  <td>{{ reservation.resource.name }}</td>
+                  <td>{{ reservation.start_datetime|date:'d/m/Y H:i' }}</td>
+                  <td>
+                    <span class="badge_btn_1">
+                      {{ reservation.get_status_display }}
+                    </span>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="4">Aucune réservation à venir.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="white_card card_height_100 mb_30">
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Statuts des réservations</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+        <div class="table-responsive">
+          <table class="table bayer_table m-0">
+            <tbody>
+              {% for item in status_cards %}
+                <tr style="border: hidden;">
+                  <td>
+                    <div class="payment_gatway">
+                      <h5 class="byer_name f_s_16 f_w_700 color_theme">
+                        {{ item.label }}
+                      </h5>
+                      <p class="color_gray f_s_12 f_w_700">
+                        Réservations
+                      </p>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="payment_gatway text-end">
+                      <h5 class="byer_name f_s_16 f_w_700 color_theme">
+                        {{ item.total }}
+                      </h5>
+                    </div>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr style="border: hidden;">
+                  <td>Aucune réservation enregistrée.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt_30">
+          <a href="{% url 'reservations:backoffice_reservations' %}" class="btn_1">
+            Gérer les réservations
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="row">
+
+  <div class="col-lg-6">
+    <div class="white_card mb_30">
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Réservations récentes</h3>
+          </div>
+
+          <div class="header_more_tool">
+            <a href="{% url 'reservations:backoffice_reservations' %}" class="btn_1">
+              Toutes
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+        <div class="table-responsive">
+          <table class="table bayer_table m-0">
+            <tbody>
+              {% for reservation in recent_reservations %}
+                <tr style="border: hidden;">
+                  <td>
+                    <div class="payment_gatway">
+                      <h5 class="byer_name f_s_16 f_w_700 color_theme">
+                        {{ reservation.customer_name }}
+                      </h5>
+                      <p class="color_gray f_s_12 f_w_700">
+                        {{ reservation.resource.name }}
+                      </p>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="payment_gatway text-end">
+                      <h5 class="byer_name f_s_16 f_w_700 color_theme">
+                        {{ reservation.get_status_display }}
+                      </h5>
+                      <p class="color_gray f_s_12 f_w_700">
+                        {{ reservation.created_at|date:'d/m/Y H:i' }}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr style="border: hidden;">
+                  <td>Aucune réservation récente.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="white_card mb_30">
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Accès rapides</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+        <div class="row">
+
+          <div class="col-md-6 mb_20">
+            <a href="{% url 'reservations:backoffice_resource_create' %}" class="btn_1 w-100 text-center">
+              Nouvelle ressource
+            </a>
+          </div>
+
+          <div class="col-md-6 mb_20">
+            <a href="{% url 'reservations:backoffice_resources' %}" class="btn_1 w-100 text-center">
+              Ressources
+            </a>
+          </div>
+
+          <div class="col-md-6 mb_20">
+            <a href="{% url 'reservations:backoffice_reservations' %}" class="btn_1 w-100 text-center">
+              Réservations
+            </a>
+          </div>
+
+          <div class="col-md-6 mb_20">
+            <a href="{% url 'reservations:backoffice_payments' %}" class="btn_1 w-100 text-center">
+              Paiements
+            </a>
+          </div>
+
+          <div class="col-md-6 mb_20">
+            <a href="{% url 'reservations:home' %}" class="btn_1 w-100 text-center">
+              Voir la vitrine
+            </a>
+          </div>
+
+          <div class="col-md-6 mb_20">
+            <a href="{% url 'admin:index' %}" class="btn_1 w-100 text-center">
+              Admin Django
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
 {% endblock %}

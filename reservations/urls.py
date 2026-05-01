@@ -18,6 +18,7 @@ urlpatterns = [
     path('backoffice/ressources/', views.BackofficeResourceListView.as_view(), name='backoffice_resources'),
     path('backoffice/ressources/ajouter/', views.BackofficeResourceCreateView.as_view(), name='backoffice_resource_create'),
     path('backoffice/ressources/<int:pk>/modifier/', views.BackofficeResourceUpdateView.as_view(), name='backoffice_resource_update'),
+    path('backoffice/ressources/<int:pk>/supprimer/', views.BackofficeResourceDeleteView.as_view(), name='backoffice_resource_delete'),
     path('backoffice/reservations/', views.BackofficeReservationListView.as_view(), name='backoffice_reservations'),
     path('backoffice/reservations/<int:pk>/modifier/', views.BackofficeReservationUpdateView.as_view(), name='backoffice_reservation_update'),
     path('backoffice/paiements/', views.BackofficePaymentListView.as_view(), name='backoffice_payments'),

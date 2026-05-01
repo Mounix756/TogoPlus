@@ -1,23 +1,257 @@
-{% extends 'reservations/base.html' %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
 
-{% block content %}
-<section class="admin-layout">
-    <aside class="admin-sidebar">
-        <a class="brand admin-brand" href="{% url 'reservations:backoffice_dashboard' %}">
-            <span class="brand-mark">T+</span>
-            <span>Backoffice</span>
-        </a>
-        <nav>
-            <a href="{% url 'reservations:backoffice_dashboard' %}">Tableau de bord</a>
-            <a href="{% url 'reservations:backoffice_resources' %}">Ressources</a>
-            <a href="{% url 'reservations:backoffice_reservations' %}">Réservations</a>
-            <a href="{% url 'reservations:backoffice_payments' %}">Paiements</a>
-            <a href="{% url 'reservations:home' %}">Vitrine</a>
-            <a href="{% url 'admin:index' %}">Admin Django</a>
-        </nav>
-    </aside>
-    <div class="admin-main">
-        {% block backoffice_content %}{% endblock %}
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+
+  <title>{% block title %}Backoffice - GamedziRent{% endblock %}</title>
+
+  <link rel="icon" href="{% static 'reservations/backoffice/img/logo.png' %}" type="image/png">
+
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/css/bootstrap1.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/themefy_icon/themify-icons.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/niceselect/css/nice-select.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/owl_carousel/css/owl.carousel.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/gijgo/gijgo.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/font_awesome/css/all.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/tagsinput/tagsinput.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/datepicker/date-picker.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/scroll/scrollable.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/datatable/css/jquery.dataTables.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/datatable/css/responsive.dataTables.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/datatable/css/buttons.dataTables.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/text_editor/summernote-bs4.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/morris/morris.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/vendors/material_icon/material-icons.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/css/metisMenu.css' %}" />
+
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/css/style1.css' %}" />
+  <link rel="stylesheet" href="{% static 'reservations/backoffice/css/colors/default.css' %}" id="colorSkinCSS">
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body class="crm_body_bg">
+
+  <nav class="sidebar vertical-scroll ps-container ps-theme-default ps-active-y">
+    <div class="logo d-flex justify-content-between">
+      {% comment %} <a href="{% url 'reservations:backoffice_dashboard' %}">
+        <img src="{% static 'reservations/backoffice/img/logo.png' %}" alt="GamedziRent">
+      </a> {% endcomment %}
+
+      <a href="{% url 'reservations:backoffice_dashboard' %}">
+        <h4>GAMEDZI-RENT</h4>
+      </a>
+
+      <div class="sidebar_close_icon d-lg-none">
+        <i class="ti-close"></i>
+      </div>
     </div>
-</section>
-{% endblock %}
+
+    <ul id="sidebar_menu">
+
+      <li>
+        <a href="{% url 'reservations:backoffice_dashboard' %}" aria-expanded="false">
+          <div class="icon_menu">
+            <img src="{% static 'reservations/backoffice/img/menu-icon/dashboard.svg' %}" alt="">
+          </div>
+          <span>Tableau de bord</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'reservations:backoffice_resources' %}" aria-expanded="false">
+          <div class="icon_menu">
+            <img src="{% static 'reservations/backoffice/img/menu-icon/2.svg' %}" alt="">
+          </div>
+          <span>Ressources</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'reservations:backoffice_reservations' %}" aria-expanded="false">
+          <div class="icon_menu">
+            <img src="{% static 'reservations/backoffice/img/menu-icon/4.svg' %}" alt="">
+          </div>
+          <span>Réservations</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'reservations:backoffice_payments' %}" aria-expanded="false">
+          <div class="icon_menu">
+            <img src="{% static 'reservations/backoffice/img/menu-icon/8.svg' %}" alt="">
+          </div>
+          <span>Paiements</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'reservations:home' %}" aria-expanded="false">
+          <div class="icon_menu">
+            <img src="{% static 'reservations/backoffice/img/menu-icon/7.svg' %}" alt="">
+          </div>
+          <span>Vitrine</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="{% url 'admin:index' %}" aria-expanded="false">
+          <div class="icon_menu">
+            <img src="{% static 'reservations/backoffice/img/menu-icon/10.svg' %}" alt="">
+          </div>
+          <span>Admin Django</span>
+        </a>
+      </li>
+
+    </ul>
+  </nav>
+
+  <section class="main_content dashboard_part large_header_bg">
+
+    <div class="container-fluid g-0">
+      <div class="row">
+        <div class="col-lg-12 p-0">
+          <div class="header_iner d-flex justify-content-between align-items-center">
+
+            <div class="sidebar_icon d-lg-none">
+              <i class="ti-menu"></i>
+            </div>
+
+            <div class="serach_field-area d-flex align-items-center">
+              <div class="search_inner">
+                <form action="{% url 'reservations:backoffice_reservations' %}" method="get">
+                  <div class="search_field">
+                    <input type="text" name="q" placeholder="Rechercher une réservation...">
+                  </div>
+                  <button type="submit">
+                    <img src="{% static 'reservations/backoffice/img/icon/icon_search.svg' %}" alt="">
+                  </button>
+                </form>
+              </div>
+
+              <span class="f_s_14 f_w_400 ml_25 white_text text_white">
+                Backoffice GamedziRent
+              </span>
+            </div>
+
+            <div class="header_right d-flex justify-content-between align-items-center">
+              <div class="header_notification_warp d-flex align-items-center">
+                <li>
+                  <a class="bell_notification_clicker nav-link-notify" href="#">
+                    <img src="{% static 'reservations/backoffice/img/icon/bell.svg' %}" alt="">
+                  </a>
+                </li>
+              </div>
+
+              <div class="profile_info">
+                <img src="{% static 'reservations/backoffice/img/client_img.png' %}" alt="Utilisateur">
+
+                <div class="profile_info_iner">
+                  <div class="profile_author_name">
+                    <p>Administrateur</p>
+                    <h5>
+                      {% if request.user.is_authenticated %}
+                        {{ request.user.get_full_name|default:request.user.username }}
+                      {% else %}
+                        GamedziRent
+                      {% endif %}
+                    </h5>
+                  </div>
+
+                  <div class="profile_info_details">
+                    <a href="{% url 'reservations:home' %}">Voir la vitrine</a>
+                    <a href="{% url 'admin:index' %}">Admin Django</a>
+                    <a href="{% url 'admin:logout' %}">Déconnexion</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main_content_iner">
+      <div class="container-fluid p-0">
+
+        {% if messages %}
+          <div class="row">
+            <div class="col-lg-12">
+              {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} mb_30">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        {% block backoffice_content %}{% endblock %}
+
+      </div>
+    </div>
+
+    <div class="footer_part">
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-lg-12">
+            <div class="footer_iner text-center">
+              <p>{% now "Y" %} © GamedziRent - Backoffice de gestion</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <div id="back-top" style="display: none;">
+    <a title="Retour en haut" href="#">
+      <i class="ti-angle-up"></i>
+    </a>
+  </div>
+
+  <script src="{% static 'reservations/backoffice/js/jquery1-3.4.1.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/js/popper1.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/js/bootstrap1.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/js/metisMenu.js' %}"></script>
+
+  <script src="{% static 'reservations/backoffice/vendors/count_up/jquery.waypoints.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/chartlist/Chart.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/count_up/jquery.counterup.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/niceselect/js/jquery.nice-select.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/owl_carousel/js/owl.carousel.min.js' %}"></script>
+
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/jquery.dataTables.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/dataTables.responsive.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/dataTables.buttons.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/buttons.flash.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/jszip.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/pdfmake.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/vfs_fonts.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/buttons.html5.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/datatable/js/buttons.print.min.js' %}"></script>
+
+  <script src="{% static 'reservations/backoffice/js/chart.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/progressbar/jquery.barfiller.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/tagsinput/tagsinput.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/text_editor/summernote-bs4.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/am_chart/amcharts.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/scroll/perfect-scrollbar.min.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/scroll/scrollable-custom.js' %}"></script>
+
+  <script src="{% static 'reservations/backoffice/vendors/chart_am/core.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/chart_am/charts.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/chart_am/animated.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/chart_am/kelly.js' %}"></script>
+  <script src="{% static 'reservations/backoffice/vendors/chart_am/chart-custom.js' %}"></script>
+
+  {% block extra_js %}{% endblock %}
+
+  <script src="{% static 'reservations/backoffice/js/custom.js' %}"></script>
+</body>
+</html>

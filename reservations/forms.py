@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Reservation, Resource
+from .models import Reservation, Resource, ResourceImage
 
 
 class StyledFormMixin:
@@ -129,40 +129,29 @@ class ResourceForm(StyledFormMixin, forms.ModelForm):
         fields = [
             "category",
             "name",
-            "slug",
             "resource_type",
             "description",
             "location",
             "capacity",
             "price",
             "requires_payment",
-            "is_active",
-            "manager",
         ]
 
         labels = {
             "category": "Catégorie",
             "name": "Nom",
-            "slug": "Slug",
             "resource_type": "Type",
             "description": "Description",
             "location": "Lieu",
             "capacity": "Capacité",
             "price": "Prix",
             "requires_payment": "Paiement requis",
-            "is_active": "Active",
-            "manager": "Gestionnaire",
         }
 
         widgets = {
             "name": forms.TextInput(
                 attrs={
                     "placeholder": "Nom de la salle, du service ou de l’équipement",
-                }
-            ),
-            "slug": forms.TextInput(
-                attrs={
-                    "placeholder": "exemple-salle-conference",
                 }
             ),
             "description": forms.Textarea(
@@ -190,9 +179,93 @@ class ResourceForm(StyledFormMixin, forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.user = user
         self.apply_form_styles()
+
+    def save(self, commit=True):
+        resource = super().save(commit=False)
+
+        if resource.pk is None:
+            resource.is_active = True
+        if self.user is not None and self.user.is_authenticated:
+            resource.manager = self.user
+
+        if commit:
+            resource.save()
+
+        return resource
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleImageField(forms.ImageField):
+    widget = MultipleFileInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+
+        files = data if isinstance(data, (list, tuple)) else [data]
+        return [super(MultipleImageField, self).clean(file, initial) for file in files]
+
+
+class ResourceImagesUploadForm(forms.Form):
+    images = MultipleImageField(
+        label="Images",
+        required=False,
+        widget=MultipleFileInput(
+            attrs={
+                "accept": "image/*",
+                "class": "form-control",
+                "id": "resource-images-input",
+                "multiple": True,
+            }
+        ),
+        error_messages={
+            "invalid_image": "Sélectionnez uniquement des images valides.",
+        },
+    )
+
+    def __init__(self, *args, current_image_ids=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.current_image_ids = {int(pk) for pk in current_image_ids or []}
+        self.cleaned_delete_image_ids = set()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        uploaded_images = cleaned_data.get("images") or []
+        delete_image_ids = self._get_valid_delete_image_ids()
+        remaining_count = len(self.current_image_ids) - len(delete_image_ids)
+
+        if remaining_count + len(uploaded_images) > ResourceImage.MAX_IMAGES_PER_RESOURCE:
+            raise forms.ValidationError(
+                f"Une ressource ne peut pas contenir plus de {ResourceImage.MAX_IMAGES_PER_RESOURCE} images."
+            )
+
+        self.cleaned_delete_image_ids = delete_image_ids
+        return cleaned_data
+
+    def _get_valid_delete_image_ids(self):
+        selected_ids = set()
+        if hasattr(self.data, "getlist"):
+            values = self.data.getlist("delete_images")
+        else:
+            values = self.data.get("delete_images", [])
+            if isinstance(values, str):
+                values = [values]
+
+        for value in values:
+            try:
+                image_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if image_id in self.current_image_ids:
+                selected_ids.add(image_id)
+        return selected_ids
 
 
 class ReservationBackofficeForm(StyledFormMixin, forms.ModelForm):

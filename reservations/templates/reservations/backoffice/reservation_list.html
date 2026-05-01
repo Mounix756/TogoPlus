@@ -1,56 +1,155 @@
 {% extends 'reservations/backoffice/base.html' %}
 
-{% block title %}Réservations - Backoffice{% endblock %}
+{% block title %}Réservations - Backoffice GamedziRent{% endblock %}
 
 {% block backoffice_content %}
-<div class="admin-heading">
-    <div>
-        <p class="eyebrow">Planning</p>
-        <h1>Réservations</h1>
+
+<div class="row justify-content-center">
+  <div class="col-lg-12">
+    <div class="white_card card_height_100 mb_30">
+
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Réservations</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+        <div class="QA_section">
+
+          <div class="white_box_tittle list_header">
+            <h4>Liste des réservations</h4>
+
+            <div class="box_right d-flex lms_block">
+              <div class="add_button ms-2">
+                <a href="{% url 'reservations:backoffice_dashboard' %}" class="btn_1">
+                  Tableau de bord
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <form method="get" class="mb_30">
+            <div class="row">
+
+              <div class="col-lg-5 col-md-6 mb-3">
+                <input
+                  type="search"
+                  name="q"
+                  value="{{ filters.q }}"
+                  class="form-control"
+                  placeholder="Rechercher par client, email, téléphone ou ressource"
+                >
+              </div>
+
+              <div class="col-lg-4 col-md-6 mb-3">
+                <select name="status" class="form-control">
+                  <option value="">Tous les statuts</option>
+
+                  {% for value, label in statuses %}
+                    <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>
+                      {{ label }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-lg-3 col-md-12 mb-3">
+                <button class="btn_1 w-100 text-center" type="submit">
+                  Filtrer
+                </button>
+              </div>
+
+            </div>
+          </form>
+
+          <div class="QA_table mb_30">
+            <table class="table lms_table_active">
+              <thead>
+                <tr>
+                  <th scope="col">Client</th>
+                  <th scope="col">Contact</th>
+                  <th scope="col">Ressource</th>
+                  <th scope="col">Début</th>
+                  <th scope="col">Fin</th>
+                  <th scope="col">Participants</th>
+                  <th scope="col">Statut</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for reservation in reservations %}
+                  <tr>
+                    <th scope="row">
+                      <a
+                        href="{% url 'reservations:backoffice_reservation_update' reservation.pk %}"
+                        class="question_content"
+                      >
+                        {{ reservation.customer_name }}
+                      </a>
+                    </th>
+
+                    <td>
+                      <strong>{{ reservation.customer_email }}</strong><br>
+                      <span>{{ reservation.customer_phone|default:'Téléphone non renseigné' }}</span>
+                    </td>
+
+                    <td>
+                      {% if reservation.resource %}
+                        {{ reservation.resource.name }}
+                      {% else %}
+                        Ressource supprimée
+                      {% endif %}
+                    </td>
+
+                    <td>
+                      {{ reservation.start_datetime|date:'d/m/Y H:i' }}
+                    </td>
+
+                    <td>
+                      {{ reservation.end_datetime|date:'d/m/Y H:i' }}
+                    </td>
+
+                    <td>
+                      {{ reservation.attendees_count }}
+                    </td>
+
+                    <td>
+                      <a href="#" class="status_btn">
+                        {{ reservation.get_status_display }}
+                      </a>
+                    </td>
+
+                    <td>
+                      <a
+                        href="{% url 'reservations:backoffice_reservation_update' reservation.pk %}"
+                        class="btn btn-sm btn-outline-primary"
+                      >
+                        Modifier
+                      </a>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="8">
+                      Aucune réservation enregistrée.
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
     </div>
+  </div>
 </div>
 
-<form class="filter-bar admin-filter" method="get">
-    <input type="search" name="q" value="{{ filters.q }}" placeholder="Client, email, ressource">
-    <select name="status">
-        <option value="">Tous les statuts</option>
-        {% for value, label in statuses %}
-            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <button class="button button-primary" type="submit">Filtrer</button>
-</form>
-
-<section class="admin-panel">
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Client</th>
-                    <th>Ressource</th>
-                    <th>Début</th>
-                    <th>Fin</th>
-                    <th>Statut</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for reservation in reservations %}
-                    <tr>
-                        <td>{{ reservation.customer_name }}</td>
-                        <td>{{ reservation.resource.name }}</td>
-                        <td>{{ reservation.start_datetime|date:'d/m/Y H:i' }}</td>
-                        <td>{{ reservation.end_datetime|date:'d/m/Y H:i' }}</td>
-                        <td><span class="status-pill">{{ reservation.get_status_display }}</span></td>
-                        <td><a href="{% url 'reservations:backoffice_reservation_update' reservation.pk %}">Modifier</a></td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="6">Aucune réservation.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
-
 {% include 'reservations/pagination.html' %}
+
 {% endblock %}

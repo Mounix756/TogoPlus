@@ -78,7 +78,11 @@
 
         <div class="media d-block room mb-0">
           <figure>
-            <img src="{% static 'reservations/images/img_1.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+            {% if resource.primary_image %}
+              <img src="{{ resource.primary_image.image.url }}" alt="{{ resource.name }}" class="img-fluid">
+            {% else %}
+              <img src="{% static 'reservations/images/img_1.jpg' %}" alt="{{ resource.name }}" class="img-fluid">
+            {% endif %}
             <div class="overlap-text">
               <span>
                 {{ resource.get_resource_type_display }}
@@ -118,6 +122,22 @@
             </p>
 
             <hr>
+
+            {% if resource.images.all %}
+              <h4>Galerie</h4>
+              <div class="row mb-4">
+                {% for image in resource.images.all %}
+                  <div class="col-6 col-md-3 mb-3">
+                    <img
+                      src="{{ image.image.url }}"
+                      alt="{{ resource.name }} - vue {{ forloop.counter }}"
+                      class="img-fluid rounded"
+                      style="width: 100%; height: 120px; object-fit: cover;"
+                    >
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
 
             <h4>Informations</h4>
             <ul class="room-specs">

@@ -8,13 +8,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
 from django.db.models import Count, Q, Sum
+from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView, View
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView, View
 
 from .emails import send_reservation_confirmation_email, send_reservation_payment_email
 from .fedapay import (
@@ -34,8 +35,13 @@ from .fedapay import (
     reservation_token_hash,
     validate_transaction_matches_reservation,
 )
-from .forms import ReservationBackofficeForm, ReservationForm, ResourceForm
-from .models import Payment, Reservation, Resource, ResourceCategory
+from .forms import (
+    ReservationBackofficeForm,
+    ReservationForm,
+    ResourceForm,
+    ResourceImagesUploadForm,
+)
+from .models import Payment, Reservation, Resource, ResourceCategory, ResourceImage
 from .tokens import (
     ReservationTokenError,
     build_reservation_payment_token,
@@ -162,7 +168,7 @@ class HomeView(TemplateView):
         active_resources = Resource.objects.filter(is_active=True)
         context['featured_resources'] = (
             active_resources.select_related('category')
-            .prefetch_related('availabilities')[:6]
+            .prefetch_related('availabilities', 'images')[:6]
         )
         context['categories'] = ResourceCategory.objects.filter(is_active=True)[:6]
         context['resource_count'] = active_resources.count()
@@ -181,7 +187,7 @@ class ResourceListView(FilteredPaginationMixin, ListView):
         queryset = (
             Resource.objects.filter(is_active=True)
             .select_related('category')
-            .prefetch_related('availabilities')
+            .prefetch_related('availabilities', 'images')
         )
         query = self.request.GET.get('q', '').strip()
         resource_type = self.request.GET.get('type', '').strip()
@@ -223,7 +229,7 @@ class ResourceDetailView(DetailView):
         return (
             Resource.objects.filter(is_active=True)
             .select_related('category', 'manager')
-            .prefetch_related('availabilities', 'unavailable_periods')
+            .prefetch_related('availabilities', 'unavailable_periods', 'images')
         )
 
     def get_context_data(self, **kwargs):
@@ -519,7 +525,7 @@ class BackofficeResourceListView(FilteredPaginationMixin, StaffRequiredMixin, Li
     paginate_by = 15
 
     def get_queryset(self):
-        queryset = Resource.objects.select_related('category', 'manager')
+        queryset = Resource.objects.select_related('category', 'manager').prefetch_related('images')
         query = self.request.GET.get('q', '').strip()
         status = self.request.GET.get('status', '').strip()
 
@@ -545,26 +551,123 @@ class BackofficeResourceListView(FilteredPaginationMixin, StaffRequiredMixin, Li
         return context
 
 
-class BackofficeResourceCreateView(StaffRequiredMixin, CreateView):
-    model = Resource
+class BackofficeResourceFormMixin:
     form_class = ResourceForm
     template_name = 'reservations/backoffice/resource_form.html'
     success_url = reverse_lazy('reservations:backoffice_resources')
+    success_message = ''
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.setdefault('image_upload_form', self.get_image_upload_form())
+        context['existing_images'] = self.get_existing_images()
+        context['selected_delete_image_ids'] = self.request.POST.getlist('delete_images')
+        context['max_resource_images'] = ResourceImage.MAX_IMAGES_PER_RESOURCE
+        return context
+
+    def get_image_upload_form(self):
+        existing_image_ids = []
+        if self.object and self.object.pk:
+            existing_image_ids = self.object.images.values_list('pk', flat=True)
+
+        return ResourceImagesUploadForm(
+            self.request.POST or None,
+            self.request.FILES or None,
+            current_image_ids=existing_image_ids,
+        )
+
+    def get_existing_images(self):
+        if self.object and self.object.pk:
+            return self.object.images.all()
+        return ResourceImage.objects.none()
 
     def form_valid(self, form):
-        messages.success(self.request, 'La ressource a été créée.')
-        return super().form_valid(form)
+        context = self.get_context_data(form=form)
+        image_upload_form = context['image_upload_form']
+
+        if not image_upload_form.is_valid():
+            return self.render_to_response(context)
+
+        with db_transaction.atomic():
+            self.object = form.save()
+            self._delete_selected_images(image_upload_form)
+            self._save_uploaded_images(image_upload_form)
+
+        self._resequence_images()
+        if self.success_message:
+            messages.success(self.request, self.success_message)
+        return redirect(self.get_success_url())
+
+    def _delete_selected_images(self, image_upload_form):
+        image_ids = image_upload_form.cleaned_delete_image_ids
+        if image_ids:
+            self.object.images.filter(pk__in=image_ids).delete()
+
+    def _save_uploaded_images(self, image_upload_form):
+        next_sort_order = self.object.images.count() + 1
+        for uploaded_image in image_upload_form.cleaned_data.get('images') or []:
+            ResourceImage.objects.create(
+                resource=self.object,
+                image=uploaded_image,
+                sort_order=next_sort_order,
+            )
+            next_sort_order += 1
+
+    def _resequence_images(self):
+        for index, image in enumerate(self.object.images.order_by('id'), start=1):
+            if image.sort_order != index:
+                image.sort_order = index
+                image.save(update_fields=['sort_order'])
 
 
-class BackofficeResourceUpdateView(StaffRequiredMixin, UpdateView):
+class BackofficeResourceCreateView(BackofficeResourceFormMixin, StaffRequiredMixin, CreateView):
     model = Resource
-    form_class = ResourceForm
-    template_name = 'reservations/backoffice/resource_form.html'
+    success_message = 'La ressource a été créée.'
+
+
+class BackofficeResourceUpdateView(BackofficeResourceFormMixin, StaffRequiredMixin, UpdateView):
+    model = Resource
+    success_message = 'La ressource a été mise à jour.'
+
+
+class BackofficeResourceDeleteView(StaffRequiredMixin, DeleteView):
+    model = Resource
+    template_name = 'reservations/backoffice/resource_confirm_delete.html'
     success_url = reverse_lazy('reservations:backoffice_resources')
 
+    def get_queryset(self):
+        return Resource.objects.select_related('category').prefetch_related('images', 'reservations')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['image_count'] = self.object.images.count()
+        context['reservation_count'] = self.object.reservations.count()
+        return context
+
     def form_valid(self, form):
-        messages.success(self.request, 'La ressource a été mise à jour.')
-        return super().form_valid(form)
+        success_url = self.get_success_url()
+        resource_name = self.object.name
+
+        try:
+            self.object.delete()
+        except ProtectedError:
+            messages.warning(
+                self.request,
+                (
+                    'Cette ressource ne peut pas être supprimée parce qu’elle possède déjà '
+                    'des réservations associées. Désactivez-la plutôt si elle ne doit plus '
+                    'apparaître dans la vitrine.'
+                ),
+            )
+            return redirect(success_url)
+
+        messages.success(self.request, f'La ressource "{resource_name}" et ses images ont été supprimées.')
+        return redirect(success_url)
 
 
 class BackofficeReservationListView(FilteredPaginationMixin, StaffRequiredMixin, ListView):
@@ -635,16 +738,52 @@ class BackofficePaymentListView(FilteredPaginationMixin, StaffRequiredMixin, Lis
                 | Q(reservation__customer_name__icontains=query)
                 | Q(reservation__customer_email__icontains=query)
             )
+
         if status:
             queryset = queryset.filter(status=status)
+
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
+        all_payments = Payment.objects.select_related(
+            'reservation',
+            'reservation__resource',
+        )
+
+        succeeded_payments = all_payments.filter(
+            status=Payment.Status.SUCCEEDED,
+        )
+
+        pending_payments = all_payments.filter(
+            status=Payment.Status.PENDING,
+        )
+
+        failed_payments = all_payments.exclude(
+            status__in=[
+                Payment.Status.SUCCEEDED,
+                Payment.Status.PENDING,
+            ]
+        )
+
         context['statuses'] = Payment.Status.choices
+
         context['filters'] = {
             'q': self.request.GET.get('q', ''),
             'status': self.request.GET.get('status', ''),
         }
+
         context['querystring'] = self.get_pagination_querystring()
+
+        context['payment_stats'] = {
+            'revenue_total': succeeded_payments.aggregate(total=Sum('amount'))['total'] or 0,
+            'succeeded_count': succeeded_payments.count(),
+            'pending_total': pending_payments.aggregate(total=Sum('amount'))['total'] or 0,
+            'pending_count': pending_payments.count(),
+            'failed_total': failed_payments.aggregate(total=Sum('amount'))['total'] or 0,
+            'failed_count': failed_payments.count(),
+            'payment_count': all_payments.count(),
+        }
+
         return context

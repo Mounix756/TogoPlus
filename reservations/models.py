@@ -4,7 +4,10 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
+from django.utils.text import slugify
 
 
 class TimeStampedModel(models.Model):
@@ -91,6 +94,72 @@ class Resource(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def primary_image(self):
+        images = getattr(self, '_prefetched_objects_cache', {}).get('images')
+        if images is not None:
+            return images[0] if images else None
+        return self.images.order_by('sort_order', 'id').first()
+
+    def save(self, *args, **kwargs):
+        self.slug = self._build_unique_slug()
+        super().save(*args, **kwargs)
+
+    def _build_unique_slug(self):
+        base_slug = slugify(self.name)[:150] or 'ressource'
+        candidate = base_slug
+        suffix = 2
+        queryset = Resource.objects.exclude(pk=self.pk)
+
+        while queryset.filter(slug=candidate).exists():
+            suffix_text = f'-{suffix}'
+            candidate = f'{base_slug[:170 - len(suffix_text)]}{suffix_text}'
+            suffix += 1
+
+        return candidate
+
+
+class ResourceImage(TimeStampedModel):
+    MAX_IMAGES_PER_RESOURCE = 4
+
+    resource = models.ForeignKey(
+        Resource,
+        on_delete=models.CASCADE,
+        related_name='images',
+    )
+    image = models.ImageField(upload_to='resources/')
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+        indexes = [
+            models.Index(fields=['resource', 'sort_order']),
+        ]
+        verbose_name = 'image de ressource'
+        verbose_name_plural = 'images de ressource'
+
+    def __str__(self):
+        return f'Image {self.resource.name} #{self.pk or "new"}'
+
+    def clean(self):
+        super().clean()
+        if not self.resource_id:
+            return
+
+        queryset = ResourceImage.objects.filter(resource_id=self.resource_id)
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+        if queryset.count() >= self.MAX_IMAGES_PER_RESOURCE:
+            raise ValidationError(
+                f'Une ressource ne peut pas contenir plus de {self.MAX_IMAGES_PER_RESOURCE} images.'
+            )
+
+
+@receiver(post_delete, sender=ResourceImage)
+def delete_resource_image_file(sender, instance, **kwargs):
+    if instance.image and instance.image.name:
+        instance.image.storage.delete(instance.image.name)
 
 
 class Availability(TimeStampedModel):
