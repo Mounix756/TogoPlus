@@ -4,6 +4,7 @@ from fedapay import Webhook as FedaPayWebhook
 from fedapay._error import SignatureVerificationError
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
@@ -38,6 +39,7 @@ from .fedapay import (
 from .forms import (
     ReservationBackofficeForm,
     ReservationForm,
+    ResourceCategoryForm,
     ResourceForm,
     ResourceImagesUploadForm,
 )
@@ -487,6 +489,14 @@ class StaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
         return self.request.user.is_staff
 
 
+class BackofficeLogoutView(LoginRequiredMixin, View):
+    login_url = '/admin/login/'
+
+    def post(self, request, *args, **kwargs):
+        logout(request)
+        return redirect('reservations:home')
+
+
 class BackofficeDashboardView(StaffRequiredMixin, TemplateView):
     template_name = 'reservations/backoffice/dashboard.html'
 
@@ -516,6 +526,83 @@ class BackofficeDashboardView(StaffRequiredMixin, TemplateView):
             payments.filter(status=Payment.Status.SUCCEEDED).aggregate(total=Sum('amount'))['total'] or 0
         )
         return context
+
+
+class BackofficeCategoryListView(FilteredPaginationMixin, StaffRequiredMixin, ListView):
+    model = ResourceCategory
+    template_name = 'reservations/backoffice/category_list.html'
+    context_object_name = 'categories'
+    paginate_by = 15
+
+    def get_queryset(self):
+        queryset = ResourceCategory.objects.annotate(resource_count=Count('resources')).order_by('name')
+        query = self.request.GET.get('q', '').strip()
+        status = self.request.GET.get('status', '').strip()
+
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query)
+                | Q(description__icontains=query)
+            )
+        if status == 'active':
+            queryset = queryset.filter(is_active=True)
+        if status == 'inactive':
+            queryset = queryset.filter(is_active=False)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filters'] = {
+            'q': self.request.GET.get('q', ''),
+            'status': self.request.GET.get('status', ''),
+        }
+        context['querystring'] = self.get_pagination_querystring()
+        return context
+
+
+class BackofficeCategoryFormMixin:
+    model = ResourceCategory
+    form_class = ResourceCategoryForm
+    template_name = 'reservations/backoffice/category_form.html'
+    success_url = reverse_lazy('reservations:backoffice_categories')
+    success_message = ''
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        if self.success_message:
+            messages.success(self.request, self.success_message)
+        return response
+
+
+class BackofficeCategoryCreateView(BackofficeCategoryFormMixin, StaffRequiredMixin, CreateView):
+    success_message = 'La catégorie a été créée.'
+
+
+class BackofficeCategoryUpdateView(BackofficeCategoryFormMixin, StaffRequiredMixin, UpdateView):
+    success_message = 'La catégorie a été mise à jour.'
+
+
+class BackofficeCategoryDeleteView(StaffRequiredMixin, DeleteView):
+    model = ResourceCategory
+    template_name = 'reservations/backoffice/category_confirm_delete.html'
+    success_url = reverse_lazy('reservations:backoffice_categories')
+
+    def get_queryset(self):
+        return ResourceCategory.objects.annotate(resource_count=Count('resources'))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['resource_count'] = self.object.resources.count()
+        return context
+
+    def form_valid(self, form):
+        category_name = self.object.name
+        response = super().form_valid(form)
+        messages.success(
+            self.request,
+            f'La catégorie "{category_name}" a été supprimée. Les ressources associées restent disponibles.',
+        )
+        return response
 
 
 class BackofficeResourceListView(FilteredPaginationMixin, StaffRequiredMixin, ListView):

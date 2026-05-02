@@ -61,14 +61,23 @@
         </a>
       </li>
 
-      <li>
-        <a href="{% url 'reservations:backoffice_resources' %}" aria-expanded="false">
-          <div class="icon_menu">
-            <img src="{% static 'reservations/backoffice/img/menu-icon/2.svg' %}" alt="">
-          </div>
-          <span>Ressources</span>
-        </a>
-      </li>
+	      <li>
+	        <a href="{% url 'reservations:backoffice_resources' %}" aria-expanded="false">
+	          <div class="icon_menu">
+	            <img src="{% static 'reservations/backoffice/img/menu-icon/2.svg' %}" alt="">
+	          </div>
+	          <span>Ressources</span>
+	        </a>
+	      </li>
+
+	      <li>
+	        <a href="{% url 'reservations:backoffice_categories' %}" aria-expanded="false">
+	          <div class="icon_menu">
+	            <img src="{% static 'reservations/backoffice/img/menu-icon/3.svg' %}" alt="">
+	          </div>
+	          <span>Catégories</span>
+	        </a>
+	      </li>
 
       <li>
         <a href="{% url 'reservations:backoffice_reservations' %}" aria-expanded="false">
@@ -161,11 +170,19 @@
                     </h5>
                   </div>
 
-                  <div class="profile_info_details">
-                    <a href="{% url 'reservations:home' %}">Voir la vitrine</a>
-                    <a href="{% url 'admin:index' %}">Admin Django</a>
-                    <a href="{% url 'admin:logout' %}">Déconnexion</a>
-                  </div>
+	                  <div class="profile_info_details">
+	                    <a href="{% url 'reservations:home' %}">Voir la vitrine</a>
+	                    <a href="{% url 'admin:index' %}">Admin Django</a>
+	                    <form method="post" action="{% url 'reservations:backoffice_logout' %}">
+	                      {% csrf_token %}
+	                      <button
+	                        type="submit"
+	                        style="border: 0; background: transparent; color: inherit; display: block; width: 100%; text-align: left; padding: 0;"
+	                      >
+	                        Déconnexion
+	                      </button>
+	                    </form>
+	                  </div>
                 </div>
               </div>
             </div>

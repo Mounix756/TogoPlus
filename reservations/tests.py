@@ -24,9 +24,9 @@ from .fedapay import (
     remember_payment_attempt,
     validate_transaction_matches_reservation,
 )
-from .forms import ResourceForm, ResourceImagesUploadForm
+from .forms import ResourceCategoryForm, ResourceForm, ResourceImagesUploadForm
 from .invoices import build_invoice_filename, generate_invoice_pdf
-from .models import Availability, Payment, Reservation, Resource, ResourceImage
+from .models import Availability, Payment, Reservation, Resource, ResourceCategory, ResourceImage
 from .views import _build_payment_result_context
 
 
@@ -348,6 +348,104 @@ class ResourceBackofficeBehaviorTests(TestCase):
         )
 
         self.assertEqual(resource.slug, 'salle-premium-2')
+
+    def test_category_form_generates_slug_automatically(self):
+        form = ResourceCategoryForm(
+            data={
+                'name': 'Salles VIP',
+                'description': 'Espaces premium pour événements.',
+                'is_active': 'on',
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        category = form.save()
+
+        self.assertEqual(category.slug, 'salles-vip')
+        self.assertTrue(category.is_active)
+
+    def test_category_slug_is_made_unique_automatically(self):
+        ResourceCategory.objects.create(name='Salles VIP', slug='salles-vip')
+
+        category = ResourceCategory.objects.create(name='Salles-vip', slug='sera-remplace')
+
+        self.assertEqual(category.slug, 'salles-vip-2')
+
+    def test_category_backoffice_crud_keeps_resources_when_category_is_deleted(self):
+        self.client.force_login(self.user)
+
+        create_response = self.client.post(
+            reverse('reservations:backoffice_category_create'),
+            data={
+                'name': 'Conférences',
+                'description': 'Salles et services pour conférences.',
+                'is_active': 'on',
+            },
+        )
+
+        self.assertRedirects(create_response, reverse('reservations:backoffice_categories'))
+        category = ResourceCategory.objects.get(name='Conférences')
+        resource = Resource.objects.create(
+            category=category,
+            name='Salle Conférence A',
+            slug='salle-conference-a',
+            manager=self.user,
+        )
+
+        list_response = self.client.get(reverse('reservations:backoffice_categories'))
+
+        self.assertContains(list_response, 'Conférences')
+        self.assertContains(
+            list_response,
+            reverse('reservations:backoffice_category_update', kwargs={'pk': category.pk}),
+        )
+        self.assertContains(
+            list_response,
+            reverse('reservations:backoffice_category_delete', kwargs={'pk': category.pk}),
+        )
+
+        update_response = self.client.post(
+            reverse('reservations:backoffice_category_update', kwargs={'pk': category.pk}),
+            data={
+                'name': 'Conférences Pro',
+                'description': 'Salles et services pour événements professionnels.',
+            },
+        )
+
+        self.assertRedirects(update_response, reverse('reservations:backoffice_categories'))
+        category.refresh_from_db()
+        self.assertEqual(category.name, 'Conférences Pro')
+        self.assertEqual(category.slug, 'conferences-pro')
+        self.assertFalse(category.is_active)
+
+        confirm_response = self.client.get(
+            reverse('reservations:backoffice_category_delete', kwargs={'pk': category.pk})
+        )
+
+        self.assertContains(confirm_response, 'Confirmer la suppression')
+        self.assertContains(confirm_response, '1 ressource(s) associée(s)')
+
+        delete_response = self.client.post(
+            reverse('reservations:backoffice_category_delete', kwargs={'pk': category.pk})
+        )
+
+        self.assertRedirects(delete_response, reverse('reservations:backoffice_categories'))
+        self.assertFalse(ResourceCategory.objects.filter(pk=category.pk).exists())
+        resource.refresh_from_db()
+        self.assertIsNone(resource.category)
+
+    def test_backoffice_logout_uses_project_route_and_logs_user_out(self):
+        self.client.force_login(self.user)
+
+        base_response = self.client.get(reverse('reservations:backoffice_dashboard'))
+
+        self.assertContains(base_response, reverse('reservations:backoffice_logout'))
+        self.assertNotContains(base_response, reverse('admin:logout'))
+
+        logout_response = self.client.post(reverse('reservations:backoffice_logout'))
+
+        self.assertRedirects(logout_response, reverse('reservations:home'))
+        self.assertNotIn('_auth_user_id', self.client.session)
 
     def test_resource_create_view_uses_single_multiple_image_input(self):
         self.client.force_login(self.user)

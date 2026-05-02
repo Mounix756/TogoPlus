@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Reservation, Resource, ResourceImage
+from .models import Reservation, Resource, ResourceCategory, ResourceImage
 
 
 class StyledFormMixin:
@@ -196,6 +196,40 @@ class ResourceForm(StyledFormMixin, forms.ModelForm):
             resource.save()
 
         return resource
+
+
+class ResourceCategoryForm(StyledFormMixin, forms.ModelForm):
+    class Meta:
+        model = ResourceCategory
+        fields = [
+            "name",
+            "description",
+            "is_active",
+        ]
+
+        labels = {
+            "name": "Nom",
+            "description": "Description",
+            "is_active": "Catégorie active",
+        }
+
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "placeholder": "Nom de la catégorie",
+                }
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "rows": 5,
+                    "placeholder": "Décrivez le type de ressources regroupées dans cette catégorie.",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.apply_form_styles()
 
 
 class MultipleFileInput(forms.ClearableFileInput):

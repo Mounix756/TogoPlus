@@ -32,6 +32,23 @@ class ResourceCategory(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        self.slug = self._build_unique_slug()
+        super().save(*args, **kwargs)
+
+    def _build_unique_slug(self):
+        base_slug = slugify(self.name)[:120] or 'categorie'
+        candidate = base_slug
+        suffix = 2
+        queryset = ResourceCategory.objects.exclude(pk=self.pk)
+
+        while queryset.filter(slug=candidate).exists():
+            suffix_text = f'-{suffix}'
+            candidate = f'{base_slug[:140 - len(suffix_text)]}{suffix_text}'
+            suffix += 1
+
+        return candidate
+
 
 class Resource(TimeStampedModel):
     class ResourceType(models.TextChoices):

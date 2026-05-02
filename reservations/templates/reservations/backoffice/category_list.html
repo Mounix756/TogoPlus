@@ -1,0 +1,165 @@
+{% extends 'reservations/backoffice/base.html' %}
+
+{% block title %}Catégories - Backoffice GamedziRent{% endblock %}
+
+{% block backoffice_content %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-12">
+    <div class="white_card card_height_100 mb_30">
+
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Catégories</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+        <div class="QA_section">
+
+          <div class="white_box_tittle list_header">
+            <h4>Liste des catégories</h4>
+
+            <div class="box_right d-flex lms_block">
+              <div class="serach_field_2">
+                <div class="search_inner">
+                  <form method="get">
+                    <div class="search_field">
+                      <input
+                        type="search"
+                        name="q"
+                        value="{{ filters.q }}"
+                        placeholder="Rechercher une catégorie..."
+                      >
+                    </div>
+
+                    {% if filters.status %}
+                      <input type="hidden" name="status" value="{{ filters.status }}">
+                    {% endif %}
+
+                    <button type="submit">
+                      <i class="ti-search"></i>
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="add_button ms-2">
+                <a href="{% url 'reservations:backoffice_category_create' %}" class="btn_1">
+                  Ajouter
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <form method="get" class="mb_30">
+            <div class="row">
+              <div class="col-lg-5 col-md-6 mb-3">
+                <input
+                  type="search"
+                  name="q"
+                  value="{{ filters.q }}"
+                  class="form-control"
+                  placeholder="Rechercher par nom ou description"
+                >
+              </div>
+
+              <div class="col-lg-4 col-md-6 mb-3">
+                <select name="status" class="form-control">
+                  <option value="">Tous les statuts</option>
+                  <option value="active" {% if filters.status == 'active' %}selected{% endif %}>
+                    Actives
+                  </option>
+                  <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>
+                    Inactives
+                  </option>
+                </select>
+              </div>
+
+              <div class="col-lg-3 col-md-12 mb-3">
+                <button class="btn_1 w-100 text-center" type="submit">
+                  Filtrer
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div class="QA_table mb_30">
+            <table class="table lms_table_active">
+              <thead>
+                <tr>
+                  <th scope="col">Nom</th>
+                  <th scope="col">Slug</th>
+                  <th scope="col">Ressources</th>
+                  <th scope="col">Statut</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for category in categories %}
+                  <tr>
+                    <th scope="row">
+                      <a
+                        href="{% url 'reservations:backoffice_category_update' category.pk %}"
+                        class="question_content"
+                      >
+                        {{ category.name }}
+                      </a>
+                    </th>
+
+                    <td>{{ category.slug }}</td>
+
+                    <td>{{ category.resource_count }}</td>
+
+                    <td>
+                      {% if category.is_active %}
+                        <a href="#" class="status_btn">Active</a>
+                      {% else %}
+                        <a href="#" class="status_btn" style="background: #ff6a6a;">
+                          Inactive
+                        </a>
+                      {% endif %}
+                    </td>
+
+                    <td>
+                      <div class="d-flex flex-wrap" style="gap: 8px;">
+                        <a
+                          href="{% url 'reservations:backoffice_category_update' category.pk %}"
+                          class="btn btn-sm btn-outline-primary"
+                        >
+                          Modifier
+                        </a>
+
+                        <a
+                          href="{% url 'reservations:backoffice_category_delete' category.pk %}"
+                          class="btn btn-sm btn-outline-danger"
+                        >
+                          Supprimer
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="5">
+                      Aucune catégorie enregistrée.
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% include 'reservations/pagination.html' %}
+
+{% endblock %}
