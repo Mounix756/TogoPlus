@@ -1,0 +1,186 @@
+{% extends 'reservations/backoffice/base.html' %}
+
+{% block title %}Indisponibilités - Backoffice GamedziRent{% endblock %}
+
+{% block backoffice_content %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-12">
+    <div class="white_card card_height_100 mb_30">
+
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Périodes d’indisponibilité</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+        <div class="QA_section">
+
+          <div class="white_box_tittle list_header">
+            <h4>Planning des ressources bloquées</h4>
+
+            <div class="box_right d-flex lms_block">
+              <div class="serach_field_2">
+                <div class="search_inner">
+                  <form method="get">
+                    <div class="search_field">
+                      <input
+                        type="search"
+                        name="q"
+                        value="{{ filters.q }}"
+                        placeholder="Rechercher..."
+                      >
+                    </div>
+
+                    {% if filters.resource %}
+                      <input type="hidden" name="resource" value="{{ filters.resource }}">
+                    {% endif %}
+
+                    {% if filters.status %}
+                      <input type="hidden" name="status" value="{{ filters.status }}">
+                    {% endif %}
+
+                    <button type="submit">
+                      <i class="ti-search"></i>
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="add_button ms-2">
+                <a href="{% url 'reservations:backoffice_unavailable_period_create' %}" class="btn_1">
+                  Ajouter
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <form method="get" class="mb_30">
+            <div class="row">
+              <div class="col-lg-4 col-md-6 mb-3">
+                <input
+                  type="search"
+                  name="q"
+                  value="{{ filters.q }}"
+                  class="form-control"
+                  placeholder="Ressource ou motif"
+                >
+              </div>
+
+              <div class="col-lg-3 col-md-6 mb-3">
+                <select name="resource" class="form-control">
+                  <option value="">Toutes les ressources</option>
+                  {% for resource in resources %}
+                    <option value="{{ resource.pk }}" {% if filters.resource == resource.pk|stringformat:"s" %}selected{% endif %}>
+                      {{ resource.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-lg-3 col-md-6 mb-3">
+                <select name="status" class="form-control">
+                  <option value="">Toutes les périodes</option>
+                  <option value="active" {% if filters.status == 'active' %}selected{% endif %}>
+                    En cours
+                  </option>
+                  <option value="upcoming" {% if filters.status == 'upcoming' %}selected{% endif %}>
+                    À venir
+                  </option>
+                  <option value="past" {% if filters.status == 'past' %}selected{% endif %}>
+                    Passées
+                  </option>
+                </select>
+              </div>
+
+              <div class="col-lg-2 col-md-6 mb-3">
+                <button class="btn_1 w-100 text-center" type="submit">
+                  Filtrer
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div class="QA_table mb_30">
+            <table class="table lms_table_active">
+              <thead>
+                <tr>
+                  <th scope="col">Ressource</th>
+                  <th scope="col">Début</th>
+                  <th scope="col">Fin</th>
+                  <th scope="col">Motif</th>
+                  <th scope="col">Statut</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for period in unavailable_periods %}
+                  <tr>
+                    <th scope="row">
+                      <a
+                        href="{% url 'reservations:backoffice_unavailable_period_update' period.pk %}"
+                        class="question_content"
+                      >
+                        {{ period.resource.name }}
+                      </a>
+                    </th>
+
+                    <td>{{ period.starts_at|date:'d/m/Y H:i' }}</td>
+
+                    <td>{{ period.ends_at|date:'d/m/Y H:i' }}</td>
+
+                    <td>{{ period.reason|default:'Non précisé' }}</td>
+
+                    <td>
+                      {% if period.starts_at <= now and period.ends_at > now %}
+                        <a href="#" class="status_btn" style="background: #ff6a6a;">En cours</a>
+                      {% elif period.starts_at > now %}
+                        <a href="#" class="status_btn">À venir</a>
+                      {% else %}
+                        <a href="#" class="status_btn" style="background: #6c757d;">Passée</a>
+                      {% endif %}
+                    </td>
+
+                    <td>
+                      <div class="d-flex flex-wrap" style="gap: 8px;">
+                        <a
+                          href="{% url 'reservations:backoffice_unavailable_period_update' period.pk %}"
+                          class="btn btn-sm btn-outline-primary"
+                        >
+                          Modifier
+                        </a>
+
+                        <a
+                          href="{% url 'reservations:backoffice_unavailable_period_delete' period.pk %}"
+                          class="btn btn-sm btn-outline-danger"
+                        >
+                          Supprimer
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="6">
+                      Aucune période d’indisponibilité enregistrée.
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% include 'reservations/pagination.html' %}
+
+{% endblock %}

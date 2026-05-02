@@ -24,9 +24,9 @@ from .fedapay import (
     remember_payment_attempt,
     validate_transaction_matches_reservation,
 )
-from .forms import ResourceCategoryForm, ResourceForm, ResourceImagesUploadForm
+from .forms import ResourceCategoryForm, ResourceForm, ResourceImagesUploadForm, UnavailablePeriodForm
 from .invoices import build_invoice_filename, generate_invoice_pdf
-from .models import Availability, Payment, Reservation, Resource, ResourceCategory, ResourceImage
+from .models import Availability, Payment, Reservation, Resource, ResourceCategory, ResourceImage, UnavailablePeriod
 from .views import _build_payment_result_context
 
 
@@ -119,6 +119,49 @@ class ReservationModelTests(TestCase):
             start_datetime=timezone.make_aware(datetime(2026, 5, 4, 8, 0)),
             end_datetime=timezone.make_aware(datetime(2026, 5, 4, 17, 0)),
             attendees_count=12,
+        )
+
+        reservation.full_clean()
+
+    def test_reservation_rejects_slot_during_unavailable_period(self):
+        starts_at = timezone.make_aware(datetime(2026, 5, 6, 8, 0))
+        ends_at = timezone.make_aware(datetime(2026, 5, 6, 18, 0))
+        UnavailablePeriod.objects.create(
+            resource=self.resource,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            reason='Maintenance',
+        )
+
+        reservation = Reservation(
+            resource=self.resource,
+            customer_name='Client Maintenance',
+            customer_email='maintenance@example.com',
+            start_datetime=timezone.make_aware(datetime(2026, 5, 6, 10, 0)),
+            end_datetime=timezone.make_aware(datetime(2026, 5, 6, 12, 0)),
+            attendees_count=10,
+        )
+
+        with self.assertRaises(ValidationError) as error_context:
+            reservation.full_clean()
+
+        self.assertIn('indisponible', str(error_context.exception))
+
+    def test_reservation_accepts_slot_outside_unavailable_period(self):
+        UnavailablePeriod.objects.create(
+            resource=self.resource,
+            starts_at=timezone.make_aware(datetime(2026, 5, 6, 8, 0)),
+            ends_at=timezone.make_aware(datetime(2026, 5, 6, 18, 0)),
+            reason='Maintenance',
+        )
+
+        reservation = Reservation(
+            resource=self.resource,
+            customer_name='Client Disponible',
+            customer_email='disponible@example.com',
+            start_datetime=timezone.make_aware(datetime(2026, 5, 7, 10, 0)),
+            end_datetime=timezone.make_aware(datetime(2026, 5, 7, 12, 0)),
+            attendees_count=10,
         )
 
         reservation.full_clean()
@@ -446,6 +489,110 @@ class ResourceBackofficeBehaviorTests(TestCase):
 
         self.assertRedirects(logout_response, reverse('reservations:home'))
         self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_unavailable_period_form_rejects_overlapping_periods(self):
+        resource = Resource.objects.create(
+            name='Salle indisponible',
+            slug='salle-indisponible',
+            manager=self.user,
+        )
+        UnavailablePeriod.objects.create(
+            resource=resource,
+            starts_at=timezone.make_aware(datetime(2026, 6, 2, 8, 0)),
+            ends_at=timezone.make_aware(datetime(2026, 6, 2, 12, 0)),
+            reason='Maintenance',
+        )
+        form = UnavailablePeriodForm(
+            data={
+                'resource': resource.pk,
+                'starts_at': '2026-06-02T11:00',
+                'ends_at': '2026-06-02T15:00',
+                'reason': 'Nettoyage',
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('chevauche', str(form.errors))
+
+    def test_unavailable_period_backoffice_crud(self):
+        resource = Resource.objects.create(
+            name='Salle blocable',
+            slug='salle-blocable',
+            manager=self.user,
+        )
+        self.client.force_login(self.user)
+
+        create_response = self.client.post(
+            reverse('reservations:backoffice_unavailable_period_create'),
+            data={
+                'resource': resource.pk,
+                'starts_at': '2026-06-03T08:00',
+                'ends_at': '2026-06-03T12:00',
+                'reason': 'Maintenance technique',
+            },
+        )
+
+        self.assertRedirects(create_response, reverse('reservations:backoffice_unavailable_periods'))
+        period = UnavailablePeriod.objects.get(resource=resource)
+
+        list_response = self.client.get(reverse('reservations:backoffice_unavailable_periods'))
+
+        self.assertContains(list_response, 'Salle blocable')
+        self.assertContains(
+            list_response,
+            reverse('reservations:backoffice_unavailable_period_update', kwargs={'pk': period.pk}),
+        )
+        self.assertContains(
+            list_response,
+            reverse('reservations:backoffice_unavailable_period_delete', kwargs={'pk': period.pk}),
+        )
+
+        update_response = self.client.post(
+            reverse('reservations:backoffice_unavailable_period_update', kwargs={'pk': period.pk}),
+            data={
+                'resource': resource.pk,
+                'starts_at': '2026-06-03T09:00',
+                'ends_at': '2026-06-03T13:00',
+                'reason': 'Maintenance prolongée',
+            },
+        )
+
+        self.assertRedirects(update_response, reverse('reservations:backoffice_unavailable_periods'))
+        period.refresh_from_db()
+        self.assertEqual(period.reason, 'Maintenance prolongée')
+
+        confirm_response = self.client.get(
+            reverse('reservations:backoffice_unavailable_period_delete', kwargs={'pk': period.pk})
+        )
+
+        self.assertContains(confirm_response, 'Confirmer la suppression')
+
+        delete_response = self.client.post(
+            reverse('reservations:backoffice_unavailable_period_delete', kwargs={'pk': period.pk})
+        )
+
+        self.assertRedirects(delete_response, reverse('reservations:backoffice_unavailable_periods'))
+        self.assertFalse(UnavailablePeriod.objects.filter(pk=period.pk).exists())
+
+    def test_resource_detail_disables_reservation_when_resource_is_currently_unavailable(self):
+        resource = Resource.objects.create(
+            name='Salle actuellement indisponible',
+            slug='salle-actuellement-indisponible',
+            manager=self.user,
+        )
+        UnavailablePeriod.objects.create(
+            resource=resource,
+            starts_at=timezone.now() - timedelta(hours=1),
+            ends_at=timezone.now() + timedelta(hours=2),
+            reason='Maintenance',
+        )
+
+        response = self.client.get(reverse('reservations:resource_detail', kwargs={'slug': resource.slug}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'actuellement indisponible')
+        self.assertContains(response, 'id="reservation-submit-button"')
+        self.assertContains(response, 'disabled')
 
     def test_resource_create_view_uses_single_multiple_image_input(self):
         self.client.force_login(self.user)

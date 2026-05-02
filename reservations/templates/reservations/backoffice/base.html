@@ -79,8 +79,17 @@
 	        </a>
 	      </li>
 
-      <li>
-        <a href="{% url 'reservations:backoffice_reservations' %}" aria-expanded="false">
+	      <li>
+	        <a href="{% url 'reservations:backoffice_unavailable_periods' %}" aria-expanded="false">
+	          <div class="icon_menu">
+	            <img src="{% static 'reservations/backoffice/img/menu-icon/5.svg' %}" alt="">
+	          </div>
+	          <span>Indisponibilités</span>
+	        </a>
+	      </li>
+
+	      <li>
+	        <a href="{% url 'reservations:backoffice_reservations' %}" aria-expanded="false">
           <div class="icon_menu">
             <img src="{% static 'reservations/backoffice/img/menu-icon/4.svg' %}" alt="">
           </div>

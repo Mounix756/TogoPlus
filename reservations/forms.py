@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Reservation, Resource, ResourceCategory, ResourceImage
+from .models import Reservation, Resource, ResourceCategory, ResourceImage, UnavailablePeriod
 
 
 class StyledFormMixin:
@@ -389,4 +389,55 @@ class ReservationBackofficeForm(StyledFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.apply_form_styles()
+
+
+class UnavailablePeriodForm(StyledFormMixin, forms.ModelForm):
+    starts_at = forms.DateTimeField(
+        label="Début",
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={
+                "type": "datetime-local",
+            },
+        ),
+    )
+
+    ends_at = forms.DateTimeField(
+        label="Fin",
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={
+                "type": "datetime-local",
+            },
+        ),
+    )
+
+    class Meta:
+        model = UnavailablePeriod
+        fields = [
+            "resource",
+            "starts_at",
+            "ends_at",
+            "reason",
+        ]
+
+        labels = {
+            "resource": "Ressource",
+            "reason": "Motif",
+        }
+
+        widgets = {
+            "reason": forms.TextInput(
+                attrs={
+                    "placeholder": "Maintenance, événement privé, indisponibilité technique...",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["resource"].queryset = Resource.objects.order_by("name")
         self.apply_form_styles()

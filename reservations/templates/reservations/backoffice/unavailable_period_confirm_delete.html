@@ -1,0 +1,63 @@
+{% extends 'reservations/backoffice/base.html' %}
+
+{% block title %}Supprimer une indisponibilité - Backoffice GamedziRent{% endblock %}
+
+{% block backoffice_content %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <div class="white_card card_height_100 mb_30">
+
+      <div class="white_card_header">
+        <div class="box_header m-0">
+          <div class="main-title">
+            <h3 class="m-0">Confirmer la suppression</h3>
+          </div>
+
+          <div class="header_more_tool">
+            <a href="{% url 'reservations:backoffice_unavailable_periods' %}" class="btn_2">
+              Retour
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="white_card_body">
+
+        <div class="alert alert-danger">
+          Vous êtes sur le point de supprimer l’indisponibilité de
+          <strong>{{ object.resource.name }}</strong>.
+        </div>
+
+        <div class="mb_30">
+          <p class="mb-1">
+            Du {{ object.starts_at|date:'d/m/Y H:i' }} au {{ object.ends_at|date:'d/m/Y H:i' }}.
+          </p>
+          <p class="mb-0">
+            Motif : {{ object.reason|default:'Non précisé' }}
+          </p>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="d-flex justify-content-end flex-wrap" style="gap: 10px;">
+            <a href="{% url 'reservations:backoffice_unavailable_periods' %}" class="btn_2">
+              Annuler
+            </a>
+
+            <button type="submit" class="btn btn-danger">
+              Supprimer définitivement
+            </button>
+          </div>
+        </form>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

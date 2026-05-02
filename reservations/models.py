@@ -248,6 +248,33 @@ class UnavailablePeriod(TimeStampedModel):
     def __str__(self):
         return f'{self.resource} indisponible du {self.starts_at:%d/%m/%Y %H:%M}'
 
+    def clean(self):
+        errors = {}
+
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            errors['ends_at'] = 'La date de fin doit être après la date de début.'
+
+        if self.resource_id and self.starts_at and self.ends_at and self.ends_at > self.starts_at:
+            overlap_query = UnavailablePeriod.objects.filter(
+                resource=self.resource,
+                starts_at__lt=self.ends_at,
+                ends_at__gt=self.starts_at,
+            )
+            if self.pk:
+                overlap_query = overlap_query.exclude(pk=self.pk)
+
+            if overlap_query.exists():
+                errors['starts_at'] = (
+                    'Cette période chevauche déjà une autre indisponibilité de cette ressource.'
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 class Reservation(TimeStampedModel):
     class Status(models.TextChoices):
@@ -375,6 +402,18 @@ class Reservation(TimeStampedModel):
                 errors['start_datetime'] = (
                     'Cette ressource est déjà occupée sur la période sélectionnée. '
                     'Nous ne pouvons pas la fournir sur ce créneau.'
+                )
+
+            unavailable_query = UnavailablePeriod.objects.filter(
+                resource=self.resource,
+                starts_at__lt=self.end_datetime,
+                ends_at__gt=self.start_datetime,
+            )
+
+            if unavailable_query.exists() and 'start_datetime' not in errors:
+                errors['start_datetime'] = (
+                    'Cette ressource est indisponible sur la période sélectionnée. '
+                    'Nous ne pouvons pas la louer sur ce créneau.'
                 )
 
         if errors:

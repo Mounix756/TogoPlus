@@ -42,8 +42,9 @@ from .forms import (
     ResourceCategoryForm,
     ResourceForm,
     ResourceImagesUploadForm,
+    UnavailablePeriodForm,
 )
-from .models import Payment, Reservation, Resource, ResourceCategory, ResourceImage
+from .models import Payment, Reservation, Resource, ResourceCategory, ResourceImage, UnavailablePeriod
 from .tokens import (
     ReservationTokenError,
     build_reservation_payment_token,
@@ -236,6 +237,7 @@ class ResourceDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        now = timezone.now()
         context.setdefault(
             'form',
             ReservationForm(
@@ -243,9 +245,20 @@ class ResourceDetailView(DetailView):
                 user=self.request.user,
             ),
         )
-        context['upcoming_unavailable_periods'] = self.object.unavailable_periods.filter(
-            ends_at__gte=timezone.now()
-        )[:5]
+        unavailable_periods = self.object.unavailable_periods.filter(ends_at__gte=now).order_by('starts_at')
+        current_unavailable_period = unavailable_periods.filter(starts_at__lte=now, ends_at__gt=now).first()
+        context['upcoming_unavailable_periods'] = unavailable_periods[:5]
+        context['current_unavailable_period'] = current_unavailable_period
+        context['unavailable_periods_payload'] = [
+            {
+                'starts_at': timezone.localtime(period.starts_at).isoformat(),
+                'ends_at': timezone.localtime(period.ends_at).isoformat(),
+                'starts_at_display': timezone.localtime(period.starts_at).strftime('%d/%m/%Y %H:%M'),
+                'ends_at_display': timezone.localtime(period.ends_at).strftime('%d/%m/%Y %H:%M'),
+                'reason': period.reason,
+            }
+            for period in unavailable_periods
+        ]
         return context
 
     def post(self, request, *args, **kwargs):
@@ -755,6 +768,95 @@ class BackofficeResourceDeleteView(StaffRequiredMixin, DeleteView):
 
         messages.success(self.request, f'La ressource "{resource_name}" et ses images ont été supprimées.')
         return redirect(success_url)
+
+
+class BackofficeUnavailablePeriodListView(FilteredPaginationMixin, StaffRequiredMixin, ListView):
+    model = UnavailablePeriod
+    template_name = 'reservations/backoffice/unavailable_period_list.html'
+    context_object_name = 'unavailable_periods'
+    paginate_by = 15
+
+    def get_queryset(self):
+        now = timezone.now()
+        queryset = UnavailablePeriod.objects.select_related('resource').order_by('-starts_at')
+        query = self.request.GET.get('q', '').strip()
+        resource_id = self.request.GET.get('resource', '').strip()
+        status = self.request.GET.get('status', '').strip()
+
+        if query:
+            queryset = queryset.filter(
+                Q(resource__name__icontains=query)
+                | Q(reason__icontains=query)
+            )
+        if resource_id:
+            queryset = queryset.filter(resource_id=resource_id)
+        if status == 'active':
+            queryset = queryset.filter(starts_at__lte=now, ends_at__gt=now)
+        if status == 'upcoming':
+            queryset = queryset.filter(starts_at__gt=now)
+        if status == 'past':
+            queryset = queryset.filter(ends_at__lte=now)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['resources'] = Resource.objects.order_by('name')
+        context['filters'] = {
+            'q': self.request.GET.get('q', ''),
+            'resource': self.request.GET.get('resource', ''),
+            'status': self.request.GET.get('status', ''),
+        }
+        context['querystring'] = self.get_pagination_querystring()
+        context['now'] = timezone.now()
+        return context
+
+
+class BackofficeUnavailablePeriodFormMixin:
+    model = UnavailablePeriod
+    form_class = UnavailablePeriodForm
+    template_name = 'reservations/backoffice/unavailable_period_form.html'
+    success_url = reverse_lazy('reservations:backoffice_unavailable_periods')
+    success_message = ''
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        if self.success_message:
+            messages.success(self.request, self.success_message)
+        return response
+
+
+class BackofficeUnavailablePeriodCreateView(
+    BackofficeUnavailablePeriodFormMixin,
+    StaffRequiredMixin,
+    CreateView,
+):
+    success_message = 'La période d’indisponibilité a été créée.'
+
+
+class BackofficeUnavailablePeriodUpdateView(
+    BackofficeUnavailablePeriodFormMixin,
+    StaffRequiredMixin,
+    UpdateView,
+):
+    success_message = 'La période d’indisponibilité a été mise à jour.'
+
+
+class BackofficeUnavailablePeriodDeleteView(StaffRequiredMixin, DeleteView):
+    model = UnavailablePeriod
+    template_name = 'reservations/backoffice/unavailable_period_confirm_delete.html'
+    success_url = reverse_lazy('reservations:backoffice_unavailable_periods')
+
+    def get_queryset(self):
+        return UnavailablePeriod.objects.select_related('resource')
+
+    def form_valid(self, form):
+        period = self.object
+        response = super().form_valid(form)
+        messages.success(
+            self.request,
+            f'L’indisponibilité de "{period.resource.name}" a été supprimée.',
+        )
+        return response
 
 
 class BackofficeReservationListView(FilteredPaginationMixin, StaffRequiredMixin, ListView):

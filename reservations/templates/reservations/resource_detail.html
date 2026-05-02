@@ -28,13 +28,29 @@
     <div class="row">
 
       <div class="col-lg-6 mb-5 mb-lg-0">
-        <h2 class="mb-3">Formulaire de réservation</h2>
-        <p class="mb-5">
-          Votre créneau est vérifié avant l’envoi du lien. La réservation ne sera enregistrée qu’après paiement confirmé.
-        </p>
+	        <h2 class="mb-3">Formulaire de réservation</h2>
+	        <p class="mb-5">
+	          Votre créneau est vérifié avant l’envoi du lien. La réservation ne sera enregistrée qu’après paiement confirmé.
+	        </p>
 
-        <form method="post" class="reservation-payment-form">
-          {% csrf_token %}
+	        {% if current_unavailable_period %}
+	          <div class="alert alert-warning">
+	            Cette ressource est actuellement indisponible jusqu’au
+	            {{ current_unavailable_period.ends_at|date:'d/m/Y H:i' }}.
+	            {% if current_unavailable_period.reason %}
+	              Motif : {{ current_unavailable_period.reason }}.
+	            {% endif %}
+	          </div>
+	        {% endif %}
+
+	        <div id="reservation-unavailable-warning" class="alert alert-warning" {% if not current_unavailable_period %}style="display: none;"{% endif %}>
+	          {% if current_unavailable_period %}
+	            Cette ressource est indisponible pour le moment. Choisissez un créneau hors période bloquée pour continuer.
+	          {% endif %}
+	        </div>
+
+	        <form method="post" class="reservation-payment-form">
+	          {% csrf_token %}
 
           {% if form.non_field_errors %}
             <div class="alert alert-danger">
@@ -63,12 +79,18 @@
             {% endfor %}
           </div>
 
-          <div class="row">
-            <div class="col-12 col-md-8 col-lg-7 form-group">
-              <input type="submit" value="Reserver" class="btn btn-primary btn-block">
-            </div>
-          </div>
-        </form>
+	          <div class="row">
+	            <div class="col-12 col-md-8 col-lg-7 form-group">
+	              <input
+	                type="submit"
+	                value="Reserver"
+	                class="btn btn-primary btn-block"
+	                id="reservation-submit-button"
+	                {% if current_unavailable_period %}disabled{% endif %}
+	              >
+	            </div>
+	          </div>
+	        </form>
       </div>
 
       <div class="col-lg-1"></div>
@@ -205,5 +227,88 @@
   </div>
 </section>
 <!-- END section -->
+
+{{ unavailable_periods_payload|json_script:"unavailable-periods-data" }}
+
+<script>
+  (function () {
+    var startInput = document.getElementById('arrival_date');
+    var endInput = document.getElementById('departure_date');
+    var submitButton = document.getElementById('reservation-submit-button');
+    var warning = document.getElementById('reservation-unavailable-warning');
+    var periodsElement = document.getElementById('unavailable-periods-data');
+    var currentUnavailable = {% if current_unavailable_period %}true{% else %}false{% endif %};
+
+    if (!startInput || !endInput || !submitButton || !warning || !periodsElement) {
+      return;
+    }
+
+    var periods = JSON.parse(periodsElement.textContent || '[]');
+
+    function parseDate(value) {
+      if (!value) {
+        return null;
+      }
+
+      var parsedDate = new Date(value);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return null;
+      }
+      return parsedDate;
+    }
+
+    function showWarning(message) {
+      warning.textContent = message;
+      warning.style.display = '';
+      submitButton.disabled = true;
+    }
+
+    function hideWarning() {
+      warning.textContent = '';
+      warning.style.display = 'none';
+      submitButton.disabled = false;
+    }
+
+    function updateReservationAvailability() {
+      var startDate = parseDate(startInput.value);
+      var endDate = parseDate(endInput.value);
+
+      if (!startDate || !endDate) {
+        if (currentUnavailable) {
+          showWarning('Cette ressource est indisponible pour le moment. Choisissez un créneau hors période bloquée pour continuer.');
+        } else {
+          hideWarning();
+        }
+        return;
+      }
+
+      if (endDate <= startDate) {
+        showWarning('La date de fin doit être après la date de début.');
+        return;
+      }
+
+      var blockedPeriod = periods.find(function (period) {
+        var periodStart = parseDate(period.starts_at);
+        var periodEnd = parseDate(period.ends_at);
+        return periodStart && periodEnd && periodStart < endDate && periodEnd > startDate;
+      });
+
+      if (blockedPeriod) {
+        var message = 'Impossible de réserver cette ressource du ' + blockedPeriod.starts_at_display + ' au ' + blockedPeriod.ends_at_display + '.';
+        if (blockedPeriod.reason) {
+          message += ' Motif : ' + blockedPeriod.reason + '.';
+        }
+        showWarning(message);
+        return;
+      }
+
+      hideWarning();
+    }
+
+    startInput.addEventListener('change', updateReservationAvailability);
+    endInput.addEventListener('change', updateReservationAvailability);
+    updateReservationAvailability();
+  }());
+</script>
 
 {% endblock %}
